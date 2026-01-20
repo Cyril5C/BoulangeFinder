@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BoulangeFinder - POI le long de votre trace</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Upload Form -->
+  <div id="upload-section" class="upload-section">
+    <div class="upload-container">
+      <h1>BoulangeFinder</h1>
+      <p>Trouvez boulangeries, cafés et points d'eau le long de votre parcours</p>
+
+      <form id="gpx-form" class="upload-form">
+        <div class="file-input-wrapper">
+          <input type="file" id="gpx-file" name="gpx" accept=".gpx" required>
+          <label for="gpx-file" class="file-label">
+            <span class="file-icon">📁</span>
+            <span class="file-text">Choisir un fichier GPX</span>
+          </label>
+          <span id="file-name" class="file-name"></span>
+        </div>
+
+        <div class="detour-input">
+          <label for="max-detour">Détour maximum (mètres):</label>
+          <input type="number" id="max-detour" name="maxDetour" value="500" min="100" max="2000" step="100">
+        </div>
+
+        <button type="submit" class="submit-btn">
+          <span class="btn-text">Analyser le parcours</span>
+          <span class="btn-loader hidden"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Map Section -->
+  <div id="map-section" class="map-section hidden">
+    <div id="map"></div>
+
+    <!-- Controls Panel -->
+    <div class="controls-panel">
+      <button id="back-btn" class="back-btn">← Nouveau fichier</button>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="filters">
+        <h3>Filtres</h3>
+        <label class="filter-item">
+          <input type="checkbox" id="filter-bakery" checked>
+          <span class="marker-icon bakery"></span>
+          Boulangeries (<span id="count-bakery">0</span>)
+        </label>
+        <label class="filter-item">
+          <input type="checkbox" id="filter-cafe" checked>
+          <span class="marker-icon cafe"></span>
+          Bars / Cafés (<span id="count-cafe">0</span>)
+        </label>
+        <label class="filter-item">
+          <input type="checkbox" id="filter-water" checked>
+          <span class="marker-icon water"></span>
+          Points d'eau (<span id="count-water">0</span>)
+        </label>
+      </div>
+
+      <div class="export-section">
+        <h3>Export</h3>
+        <button id="export-gpx" class="export-btn">Exporter GPX</button>
+        <button id="export-csv" class="export-btn">Exporter CSV</button>
+        <button id="export-json" class="export-btn">Exporter JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

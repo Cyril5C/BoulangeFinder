@@ -1,0 +1,19 @@
+{
+  "name": "boulange-finder",
+  "version": "1.0.0",
+  "description": "Visualiser des POI (boulangeries, cafés, points d'eau) le long d'une trace GPX",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": ["gpx", "poi", "leaflet", "osm", "boulangerie"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "fast-xml-parser": "^4.3.2",
+    "cors": "^2.8.5"
+  }
+}

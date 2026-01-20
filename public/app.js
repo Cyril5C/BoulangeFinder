@@ -169,7 +169,8 @@ function createPopupContent(poi) {
   };
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lon}&travelmode=bicycling`;
-  const appleMapsUrl = `https://maps.apple.com/?daddr=${poi.lat},${poi.lon}&dirflg=b`;
+  const appleMapsUrl = `https://maps.apple.com/?daddr=${poi.lat},${poi.lon}&dirflg=w`;
+  const comapsUrl = `https://omaps.app/route?dll=${poi.lat},${poi.lon}&daddr=${encodeURIComponent(poi.name)}&type=bicycle`;
 
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
@@ -177,12 +178,14 @@ function createPopupContent(poi) {
     <p>Distance du parcours: ${poi.distance}m</p>`;
 
   if (poi.tags?.opening_hours) {
-    html += `<p>Horaires: ${poi.tags.opening_hours}</p>`;
+    const hours = formatOpeningHours(poi.tags.opening_hours);
+    html += `<p>Horaires: ${hours}</p>`;
   }
 
   html += `<div class="poi-nav-links">
-    <a href="${googleMapsUrl}" target="_blank" class="nav-link google">Google Maps</a>
-    <a href="${appleMapsUrl}" target="_blank" class="nav-link apple">Apple Plans</a>
+    <a href="${googleMapsUrl}" target="_blank" class="nav-link">Google Maps</a>
+    <a href="${appleMapsUrl}" target="_blank" class="nav-link">Apple Plans</a>
+    <a href="${comapsUrl}" target="_blank" class="nav-link">Comaps</a>
   </div>`;
 
   html += '</div>';
@@ -279,6 +282,42 @@ function escapeXml(str) {
     "'": '&apos;',
     '"': '&quot;'
   }[c]));
+}
+
+function formatOpeningHours(osmHours) {
+  if (!osmHours) return null;
+
+  const dayNames = {
+    'Mo': 'Lun',
+    'Tu': 'Mar',
+    'We': 'Mer',
+    'Th': 'Jeu',
+    'Fr': 'Ven',
+    'Sa': 'Sam',
+    'Su': 'Dim',
+    'PH': 'Fériés'
+  };
+
+  // Handle simple cases
+  if (osmHours === '24/7') return 'Ouvert 24h/24, 7j/7';
+
+  let formatted = osmHours;
+
+  // Replace day abbreviations
+  Object.entries(dayNames).forEach(([en, fr]) => {
+    formatted = formatted.replace(new RegExp(`\\b${en}\\b`, 'g'), fr);
+  });
+
+  // Replace common patterns
+  formatted = formatted
+    .replace(/off/gi, 'fermé')
+    .replace(/-/g, ' - ')
+    .replace(/,\s*/g, ', ')
+    .replace(/;\s*/g, '<br>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return formatted;
 }
 
 function downloadFile(content, filename, type) {

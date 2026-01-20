@@ -1,6 +1,11 @@
 const { getBoundingBox, simplifyTrack } = require('../utils/geo');
 
-const OVERPASS_API = 'https://overpass-api.de/api/interpreter';
+// Multiple Overpass API endpoints for fallback
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+];
 
 const POI_QUERIES = {
   bakery: 'node["shop"="bakery"]',
@@ -8,9 +13,22 @@ const POI_QUERIES = {
   water: 'node["amenity"="drinking_water"]'
 };
 
+// Paris bounding box (approximate)
+const PARIS_BBOX = {
+  south: 48.815,
+  north: 48.902,
+  west: 2.225,
+  east: 2.470
+};
+
+function isInParis(lat, lon) {
+  return lat >= PARIS_BBOX.south && lat <= PARIS_BBOX.north &&
+         lon >= PARIS_BBOX.west && lon <= PARIS_BBOX.east;
+}
+
 async function findPOIsAlongRoute(trackPoints, maxDetourMeters = 500) {
   // Simplify track to reduce query complexity
-  const simplifiedTrack = simplifyTrack(trackPoints, 100);
+  const simplifiedTrack = simplifyTrack(trackPoints, 500);
 
   // Get bounding box with buffer
   const bbox = getBoundingBox(simplifiedTrack, maxDetourMeters);
@@ -18,27 +36,64 @@ async function findPOIsAlongRoute(trackPoints, maxDetourMeters = 500) {
   // Build Overpass query
   const query = buildOverpassQuery(bbox);
 
-  try {
-    const response = await fetch(OVERPASS_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(query)}`
-    });
+  // Try each endpoint until one works
+  let lastError = null;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      console.log(`Trying Overpass endpoint: ${endpoint}`);
+      const data = await fetchWithRetry(endpoint, query);
 
-    if (!response.ok) {
-      throw new Error(`Overpass API error: ${response.status}`);
+      // Filter POIs by actual distance to track
+      const pois = filterPOIsByDistance(data.elements || [], trackPoints, maxDetourMeters);
+      return pois;
+    } catch (error) {
+      console.error(`Endpoint ${endpoint} failed:`, error.message);
+      lastError = error;
     }
-
-    const data = await response.json();
-
-    // Filter POIs by actual distance to track
-    const pois = filterPOIsByDistance(data.elements, trackPoints, maxDetourMeters);
-
-    return pois;
-  } catch (error) {
-    console.error('Erreur Overpass API:', error);
-    throw error;
   }
+
+  throw lastError || new Error('All Overpass endpoints failed');
+}
+
+async function fetchWithRetry(endpoint, query, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (response.status === 429 || response.status === 504) {
+        // Rate limited or timeout - wait and retry
+        if (attempt < retries) {
+          const waitTime = (attempt + 1) * 2000;
+          console.log(`Got ${response.status}, waiting ${waitTime}ms before retry...`);
+          await sleep(waitTime);
+          continue;
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (attempt === retries) throw error;
+      await sleep((attempt + 1) * 1000);
+    }
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function buildOverpassQuery(bbox) {
@@ -46,7 +101,7 @@ function buildOverpassQuery(bbox) {
   const bboxStr = `${south},${west},${north},${east}`;
 
   return `
-    [out:json][timeout:30];
+    [out:json][timeout:60];
     (
       ${POI_QUERIES.bakery}(${bboxStr});
       ${POI_QUERIES.cafe}(${bboxStr});
@@ -61,6 +116,9 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
 
   for (const element of elements) {
     if (element.type !== 'node') continue;
+
+    // Exclude POIs in Paris (too many points)
+    if (isInParis(element.lat, element.lon)) continue;
 
     const minDistance = getMinDistanceToTrack(element.lat, element.lon, trackPoints);
 

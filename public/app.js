@@ -122,6 +122,9 @@ function showMap(data) {
   poiLayers.water = L.layerGroup();
 
   data.pois.forEach(poi => {
+    // Skip unknown POI types
+    if (!poiLayers[poi.type]) return;
+
     const marker = L.marker([poi.lat, poi.lon], {
       icon: icons[poi.type]
     });

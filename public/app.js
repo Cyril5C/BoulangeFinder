@@ -170,7 +170,7 @@ function createPopupContent(poi) {
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lon}&travelmode=bicycling`;
   const appleMapsUrl = `https://maps.apple.com/?daddr=${poi.lat},${poi.lon}&dirflg=w`;
-  const comapsUrl = `https://omaps.app/route?dll=${poi.lat},${poi.lon}&daddr=${encodeURIComponent(poi.name)}&type=bicycle`;
+  const comapsUrl = `https://comaps.at/route?dll=${poi.lat},${poi.lon}&daddr=${encodeURIComponent(poi.name)}&type=bicycle`;
 
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>

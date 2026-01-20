@@ -4,9 +4,11 @@ let trackLayer = null;
 let poiLayers = {
   bakery: null,
   cafe: null,
-  water: null
+  water: null,
+  toilets: null
 };
 let currentData = null;
+let selectedPoiTypes = [];
 
 // DOM Elements
 const uploadSection = document.getElementById('upload-section');
@@ -21,7 +23,8 @@ const backBtn = document.getElementById('back-btn');
 const icons = {
   bakery: createIcon('#f59e0b', '🥖'),
   cafe: createIcon('#8b5cf6', '☕'),
-  water: createIcon('#3b82f6', '💧')
+  water: createIcon('#3b82f6', '💧'),
+  toilets: createIcon('#10b981', '🚻')
 };
 
 function createIcon(color, emoji) {
@@ -59,9 +62,22 @@ gpxForm.addEventListener('submit', async (e) => {
   const file = gpxFileInput.files[0];
   if (!file) return;
 
+  // Get selected POI types
+  selectedPoiTypes = [];
+  if (document.getElementById('poi-bakery').checked) selectedPoiTypes.push('bakery');
+  if (document.getElementById('poi-cafe').checked) selectedPoiTypes.push('cafe');
+  if (document.getElementById('poi-water').checked) selectedPoiTypes.push('water');
+  if (document.getElementById('poi-toilets').checked) selectedPoiTypes.push('toilets');
+
+  if (selectedPoiTypes.length === 0) {
+    alert('Veuillez sélectionner au moins un type de POI');
+    return;
+  }
+
   const formData = new FormData();
   formData.append('gpx', file);
   formData.append('maxDetour', document.getElementById('max-detour').value);
+  formData.append('poiTypes', JSON.stringify(selectedPoiTypes));
 
   setLoading(true);
 
@@ -120,6 +136,7 @@ function showMap(data) {
   poiLayers.bakery = L.layerGroup();
   poiLayers.cafe = L.layerGroup();
   poiLayers.water = L.layerGroup();
+  poiLayers.toilets = L.layerGroup();
 
   data.pois.forEach(poi => {
     // Skip unknown POI types
@@ -141,24 +158,32 @@ function showMap(data) {
 
   // Update stats
   updateStats(data.stats);
-  updateFilters();
 }
 
 function createPopupContent(poi) {
   const typeLabels = {
     bakery: 'Boulangerie',
     cafe: 'Bar / Café',
-    water: "Point d'eau"
+    water: "Point d'eau",
+    toilets: 'Toilettes'
   };
 
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lon}`;
+  const appleMapsUrl = `https://maps.apple.com/?daddr=${poi.lat},${poi.lon}`;
+
   let html = `<div class="poi-popup">
-    <span class="poi-type ${poi.type}">${typeLabels[poi.type]}</span>
+    <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
     <h4>${poi.name}</h4>
     <p>Distance du parcours: ${poi.distance}m</p>`;
 
   if (poi.tags?.opening_hours) {
     html += `<p>Horaires: ${poi.tags.opening_hours}</p>`;
   }
+
+  html += `<div class="poi-nav-links">
+    <a href="${googleMapsUrl}" target="_blank" class="nav-link google">Google Maps</a>
+    <a href="${appleMapsUrl}" target="_blank" class="nav-link apple">Apple Plans</a>
+  </div>`;
 
   html += '</div>';
   return html;
@@ -169,23 +194,6 @@ function updateStats(stats) {
     <strong>${stats.trackPoints}</strong> points de trace<br>
     <strong>${stats.totalPois}</strong> POI trouvés
   `;
-
-  document.getElementById('count-bakery').textContent = stats.bakeries;
-  document.getElementById('count-cafe').textContent = stats.cafes;
-  document.getElementById('count-water').textContent = stats.waterPoints;
-}
-
-function updateFilters() {
-  ['bakery', 'cafe', 'water'].forEach(type => {
-    const checkbox = document.getElementById(`filter-${type}`);
-    checkbox.addEventListener('change', () => {
-      if (checkbox.checked) {
-        map.addLayer(poiLayers[type]);
-      } else {
-        map.removeLayer(poiLayers[type]);
-      }
-    });
-  });
 }
 
 // Back button
@@ -194,6 +202,11 @@ backBtn.addEventListener('click', () => {
   uploadSection.classList.remove('hidden');
   gpxForm.reset();
   fileNameSpan.textContent = '';
+  // Reset default checkbox state
+  document.getElementById('poi-bakery').checked = true;
+  document.getElementById('poi-cafe').checked = false;
+  document.getElementById('poi-water').checked = false;
+  document.getElementById('poi-toilets').checked = false;
 });
 
 // Export functions
@@ -229,18 +242,12 @@ function exportPOIs(format) {
 }
 
 function getFilteredPOIs() {
-  const filters = {
-    bakery: document.getElementById('filter-bakery').checked,
-    cafe: document.getElementById('filter-cafe').checked,
-    water: document.getElementById('filter-water').checked
-  };
-
-  return currentData.pois.filter(poi => filters[poi.type]);
+  return currentData.pois;
 }
 
 function generateGPX(pois) {
   let gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="BoulangeFinder">
+<gpx version="1.1" creator="BoulangesFinder">
 `;
 
   pois.forEach(poi => {

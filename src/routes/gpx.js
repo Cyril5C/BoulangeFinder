@@ -20,7 +20,25 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
     }
 
     const maxDetour = parseInt(req.body.maxDetour) || 500;
-    const pois = await findPOIsAlongRoute(trackPoints, maxDetour);
+
+    // Parse POI types from request
+    let poiTypes = ['bakery']; // Default
+    if (req.body.poiTypes) {
+      try {
+        poiTypes = JSON.parse(req.body.poiTypes);
+      } catch (e) {
+        poiTypes = req.body.poiTypes.split(',');
+      }
+    }
+
+    console.log('Requested POI types:', poiTypes);
+    const pois = await findPOIsAlongRoute(trackPoints, maxDetour, poiTypes);
+    console.log('Found POIs by type:', {
+      bakery: pois.filter(p => p.type === 'bakery').length,
+      cafe: pois.filter(p => p.type === 'cafe').length,
+      water: pois.filter(p => p.type === 'water').length,
+      toilets: pois.filter(p => p.type === 'toilets').length
+    });
 
     res.json({
       track: trackPoints,
@@ -30,7 +48,8 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
         totalPois: pois.length,
         bakeries: pois.filter(p => p.type === 'bakery').length,
         cafes: pois.filter(p => p.type === 'cafe').length,
-        waterPoints: pois.filter(p => p.type === 'water').length
+        waterPoints: pois.filter(p => p.type === 'water').length,
+        toilets: pois.filter(p => p.type === 'toilets').length
       }
     });
   } catch (error) {

@@ -10,7 +10,8 @@ const OVERPASS_ENDPOINTS = [
 const POI_QUERIES = {
   bakery: 'node["shop"="bakery"]',
   cafe: 'node["amenity"~"cafe|bar|pub"]',
-  water: 'node["amenity"="drinking_water"]'
+  water: 'node["amenity"="drinking_water"]',
+  toilets: 'node["amenity"="toilets"]'
 };
 
 // Paris bounding box (approximate)
@@ -26,15 +27,15 @@ function isInParis(lat, lon) {
          lon >= PARIS_BBOX.west && lon <= PARIS_BBOX.east;
 }
 
-async function findPOIsAlongRoute(trackPoints, maxDetourMeters = 500) {
+async function findPOIsAlongRoute(trackPoints, maxDetourMeters = 500, poiTypes = ['bakery', 'cafe', 'water', 'toilets']) {
   // Simplify track to reduce query complexity
   const simplifiedTrack = simplifyTrack(trackPoints, 500);
 
   // Get bounding box with buffer
   const bbox = getBoundingBox(simplifiedTrack, maxDetourMeters);
 
-  // Build Overpass query
-  const query = buildOverpassQuery(bbox);
+  // Build Overpass query with selected POI types
+  const query = buildOverpassQuery(bbox, poiTypes);
 
   // Try each endpoint until one works
   let lastError = null;
@@ -96,16 +97,19 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function buildOverpassQuery(bbox) {
+function buildOverpassQuery(bbox, poiTypes) {
   const { south, west, north, east } = bbox;
   const bboxStr = `${south},${west},${north},${east}`;
+
+  const queries = poiTypes
+    .filter(type => POI_QUERIES[type])
+    .map(type => `${POI_QUERIES[type]}(${bboxStr});`)
+    .join('\n      ');
 
   return `
     [out:json][timeout:60];
     (
-      ${POI_QUERIES.bakery}(${bboxStr});
-      ${POI_QUERIES.cafe}(${bboxStr});
-      ${POI_QUERIES.water}(${bboxStr});
+      ${queries}
     );
     out body;
   `;
@@ -143,6 +147,7 @@ function getPOIType(tags) {
   if (tags.shop === 'bakery') return 'bakery';
   if (tags.amenity === 'cafe' || tags.amenity === 'bar' || tags.amenity === 'pub') return 'cafe';
   if (tags.amenity === 'drinking_water') return 'water';
+  if (tags.amenity === 'toilets') return 'toilets';
   return 'unknown';
 }
 
@@ -153,6 +158,7 @@ function getDefaultName(tags) {
   if (tags.amenity === 'bar') return 'Bar';
   if (tags.amenity === 'pub') return 'Pub';
   if (tags.amenity === 'drinking_water') return "Point d'eau";
+  if (tags.amenity === 'toilets') return 'Toilettes';
   return 'POI';
 }
 

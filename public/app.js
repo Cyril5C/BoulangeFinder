@@ -168,8 +168,8 @@ function createPopupContent(poi) {
     toilets: 'Toilettes'
   };
 
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lon}`;
-  const appleMapsUrl = `https://maps.apple.com/?daddr=${poi.lat},${poi.lon}`;
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lon}&travelmode=bicycling`;
+  const appleMapsUrl = `https://maps.apple.com/?daddr=${poi.lat},${poi.lon}&dirflg=b`;
 
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>

@@ -131,6 +131,26 @@
       color: #333;
       text-decoration: underline;
     }
+
+    /* Distance markers */
+    .distance-marker {
+      background: transparent;
+    }
+
+    .distance-marker-inner {
+      background: #667eea;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
   </style>
 </head>
 <body>
@@ -226,6 +246,9 @@
         weight: 4,
         opacity: 0.8
       }).addTo(map);
+
+      // Add distance markers every 20km
+      addDistanceMarkers(data.track, map);
 
       // Add POIs
       const typeLabels = {
@@ -327,6 +350,63 @@
         .replace(/;\s*/g, '<br>')
         .replace(/\s+/g, ' ')
         .trim();
+    }
+
+    // Distance markers functions
+    function addDistanceMarkers(track, map) {
+      const intervalKm = 20;
+      let cumulativeDistance = 0;
+      let nextMarkerKm = 0;
+
+      // Add start marker (0 km)
+      addDistanceMarker(track[0].lat, track[0].lon, 0, map);
+      nextMarkerKm = intervalKm;
+
+      for (let i = 1; i < track.length; i++) {
+        const segmentDistance = haversineDistance(
+          track[i - 1].lat, track[i - 1].lon,
+          track[i].lat, track[i].lon
+        );
+
+        const prevCumulative = cumulativeDistance;
+        cumulativeDistance += segmentDistance / 1000;
+
+        while (cumulativeDistance >= nextMarkerKm) {
+          const ratio = (nextMarkerKm - prevCumulative) / (cumulativeDistance - prevCumulative);
+          const lat = track[i - 1].lat + ratio * (track[i].lat - track[i - 1].lat);
+          const lon = track[i - 1].lon + ratio * (track[i].lon - track[i - 1].lon);
+
+          addDistanceMarker(lat, lon, nextMarkerKm, map);
+          nextMarkerKm += intervalKm;
+        }
+      }
+    }
+
+    function addDistanceMarker(lat, lon, km, map) {
+      const icon = L.divIcon({
+        className: 'distance-marker',
+        html: `<div class="distance-marker-inner">${km}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const marker = L.marker([lat, lon], { icon }).addTo(map);
+      marker.bindTooltip(`${km} km`, { permanent: false, direction: 'top' });
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function toRad(deg) {
+      return deg * Math.PI / 180;
     }
 
     loadSharedMap();

@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
 const gpxRoutes = require('./routes/gpx');
+const shareRoutes = require('./routes/share');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -81,6 +82,12 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes
 app.use('/api/gpx', gpxRoutes);
+app.use('/api/share', shareRoutes);
+
+// Shared map page (public with auth)
+app.get('/share/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
 
 // Serve index.html for root
 app.get('/', (req, res) => {

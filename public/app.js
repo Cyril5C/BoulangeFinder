@@ -57,6 +57,33 @@ if ('serviceWorker' in navigator) {
     .catch(err => console.log('SW registration failed:', err));
 }
 
+// Check for shared map URL
+async function checkSharedMap() {
+  const path = window.location.pathname;
+  const match = path.match(/^\/share\/([a-zA-Z0-9_-]+)$/);
+
+  if (match) {
+    const shareId = match[1];
+    try {
+      const response = await fetch(`/api/share/${shareId}`);
+      if (response.ok) {
+        const data = await response.json();
+        currentData = data;
+        showMap(data);
+        // Update URL without reload to clean state
+        history.replaceState({}, '', '/');
+      } else {
+        alert('Carte partagée non trouvée ou expirée');
+      }
+    } catch (error) {
+      console.error('Failed to load shared map:', error);
+    }
+  }
+}
+
+// Load shared map on startup
+checkSharedMap();
+
 // Offline/Online detection
 function updateOnlineStatus() {
   isOffline = !navigator.onLine;
@@ -491,6 +518,49 @@ backBtn.addEventListener('click', () => {
   if (userLocationMarker) {
     map.removeLayer(userLocationMarker);
     userLocationMarker = null;
+  }
+});
+
+// Share function
+document.getElementById('share-btn').addEventListener('click', async () => {
+  if (!currentData) return;
+
+  const shareBtn = document.getElementById('share-btn');
+  shareBtn.disabled = true;
+  shareBtn.textContent = '...';
+
+  try {
+    const response = await fetch('/api/share/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: currentData })
+    });
+
+    if (!response.ok) {
+      throw new Error('Erreur lors du partage');
+    }
+
+    const { url } = await response.json();
+    const fullUrl = window.location.origin + url;
+
+    // Try to use native share API on mobile
+    if (navigator.share) {
+      await navigator.share({
+        title: 'Boulanges Finder - Carte partagée',
+        url: fullUrl
+      });
+    } else {
+      // Fallback: copy to clipboard
+      await navigator.clipboard.writeText(fullUrl);
+      alert('Lien copié dans le presse-papiers !\n\n' + fullUrl);
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      alert('Erreur: ' + error.message);
+    }
+  } finally {
+    shareBtn.disabled = false;
+    shareBtn.textContent = '🔗';
   }
 });
 

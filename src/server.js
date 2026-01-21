@@ -14,6 +14,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Trust proxy for Railway/Render (required for secure cookies behind reverse proxy)
+app.set('trust proxy', 1);
+
 // Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'boulanges-secret-key-change-in-prod',
@@ -22,6 +25,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
+    sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
   }
 }));

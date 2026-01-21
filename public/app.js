@@ -9,6 +9,7 @@ let poiLayers = {
 };
 let currentData = null;
 let selectedPoiTypes = [];
+let userLocationMarker = null;
 
 // DOM Elements
 const uploadSection = document.getElementById('upload-section');
@@ -18,6 +19,7 @@ const gpxFileInput = document.getElementById('gpx-file');
 const fileNameSpan = document.getElementById('file-name');
 const submitBtn = document.querySelector('.submit-btn');
 const backBtn = document.getElementById('back-btn');
+const geolocBtn = document.getElementById('geoloc-btn');
 
 // Marker icons
 const icons = {
@@ -47,6 +49,46 @@ function createIcon(color, emoji) {
   });
 }
 
+// Service Worker registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(() => console.log('Service Worker registered'))
+    .catch(err => console.log('SW registration failed:', err));
+}
+
+// LocalStorage cache functions
+function saveToCache(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      timestamp: Date.now(),
+      data: data
+    }));
+  } catch (e) {
+    console.warn('LocalStorage full, clearing old data');
+    localStorage.clear();
+  }
+}
+
+function loadFromCache(key, maxAgeMs = 24 * 60 * 60 * 1000) {
+  try {
+    const cached = localStorage.getItem(key);
+    if (!cached) return null;
+
+    const { timestamp, data } = JSON.parse(cached);
+    if (Date.now() - timestamp > maxAgeMs) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getCacheKey(file, maxDetour, poiTypes) {
+  return `gpx_${file.name}_${file.size}_${maxDetour}_${poiTypes.sort().join('-')}`;
+}
+
 // File input display
 gpxFileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -74,9 +116,20 @@ gpxForm.addEventListener('submit', async (e) => {
     return;
   }
 
+  const maxDetour = document.getElementById('max-detour').value;
+  const cacheKey = getCacheKey(file, maxDetour, selectedPoiTypes);
+
+  // Check cache first
+  const cached = loadFromCache(cacheKey);
+  if (cached) {
+    currentData = cached;
+    showMap(currentData);
+    return;
+  }
+
   const formData = new FormData();
   formData.append('gpx', file);
-  formData.append('maxDetour', document.getElementById('max-detour').value);
+  formData.append('maxDetour', maxDetour);
   formData.append('poiTypes', JSON.stringify(selectedPoiTypes));
 
   setLoading(true);
@@ -93,6 +146,10 @@ gpxForm.addEventListener('submit', async (e) => {
     }
 
     currentData = await response.json();
+
+    // Save to cache
+    saveToCache(cacheKey, currentData);
+
     showMap(currentData);
   } catch (error) {
     alert(error.message);
@@ -155,9 +212,6 @@ function showMap(data) {
 
   // Fit bounds
   map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
-
-  // Update stats
-  updateStats(data.stats);
 }
 
 function createPopupContent(poi) {
@@ -167,10 +221,6 @@ function createPopupContent(poi) {
     water: "Point d'eau",
     toilets: 'Toilettes'
   };
-
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lon}&travelmode=bicycling`;
-  const appleMapsUrl = `https://maps.apple.com/?daddr=${poi.lat},${poi.lon}&dirflg=w`;
-  const comapsUrl = `https://comaps.at/route?dll=${poi.lat},${poi.lon}&daddr=${encodeURIComponent(poi.name)}&type=bicycle`;
 
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
@@ -183,21 +233,103 @@ function createPopupContent(poi) {
   }
 
   html += `<div class="poi-nav-links">
-    <a href="${googleMapsUrl}" target="_blank" class="nav-link">Google Maps</a>
-    <a href="${appleMapsUrl}" target="_blank" class="nav-link">Apple Plans</a>
-    <a href="${comapsUrl}" target="_blank" class="nav-link">Comaps</a>
+    <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'google', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Google Maps</a>
+    <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'apple', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Apple Plans</a>
+    <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'comaps', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Comaps</a>
   </div>`;
 
   html += '</div>';
   return html;
 }
 
-function updateStats(stats) {
-  document.getElementById('stats').innerHTML = `
-    <strong>${stats.trackPoints}</strong> points de trace<br>
-    <strong>${stats.totalPois}</strong> POI trouvés
-  `;
+function navigateTo(destLat, destLon, app, name) {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const startLat = position.coords.latitude;
+        const startLon = position.coords.longitude;
+        openNavApp(startLat, startLon, destLat, destLon, app, name);
+      },
+      () => {
+        // Fallback sans géolocalisation
+        openNavApp(null, null, destLat, destLon, app, name);
+      },
+      { timeout: 5000, maximumAge: 60000 }
+    );
+  } else {
+    openNavApp(null, null, destLat, destLon, app, name);
+  }
 }
+
+function openNavApp(startLat, startLon, destLat, destLon, app, name) {
+  let url;
+
+  switch (app) {
+    case 'google':
+      if (startLat && startLon) {
+        url = `https://www.google.com/maps/dir/?api=1&origin=${startLat},${startLon}&destination=${destLat},${destLon}&travelmode=bicycling`;
+      } else {
+        url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLon}&travelmode=bicycling`;
+      }
+      break;
+    case 'apple':
+      url = `https://maps.apple.com/?daddr=${destLat},${destLon}&dirflg=w`;
+      break;
+    case 'comaps':
+      if (startLat && startLon) {
+        url = `https://comaps.at/route?sll=${startLat},${startLon}&dll=${destLat},${destLon}&type=bicycle`;
+      } else {
+        // Sans position de départ, ouvrir juste le point sur la carte
+        url = `https://comaps.at/@${destLat},${destLon},17z`;
+      }
+      break;
+  }
+
+  window.open(url, '_blank');
+}
+
+// Geolocation button
+geolocBtn.addEventListener('click', () => {
+  if (!navigator.geolocation) {
+    alert('Géolocalisation non supportée');
+    return;
+  }
+
+  geolocBtn.classList.add('loading');
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+
+      // Remove existing marker
+      if (userLocationMarker) {
+        map.removeLayer(userLocationMarker);
+      }
+
+      // Add user location marker
+      userLocationMarker = L.circleMarker([latitude, longitude], {
+        radius: 10,
+        fillColor: '#667eea',
+        color: '#fff',
+        weight: 3,
+        opacity: 1,
+        fillOpacity: 0.8
+      }).addTo(map);
+
+      userLocationMarker.bindPopup('Ma position').openPopup();
+
+      // Center map on user location
+      map.setView([latitude, longitude], 15);
+
+      geolocBtn.classList.remove('loading');
+    },
+    (error) => {
+      geolocBtn.classList.remove('loading');
+      alert('Impossible d\'obtenir votre position');
+    },
+    { timeout: 10000, maximumAge: 0 }
+  );
+});
 
 // Back button
 backBtn.addEventListener('click', () => {
@@ -210,6 +342,12 @@ backBtn.addEventListener('click', () => {
   document.getElementById('poi-cafe').checked = false;
   document.getElementById('poi-water').checked = false;
   document.getElementById('poi-toilets').checked = false;
+
+  // Remove user location marker
+  if (userLocationMarker) {
+    map.removeLayer(userLocationMarker);
+    userLocationMarker = null;
+  }
 });
 
 // Export functions

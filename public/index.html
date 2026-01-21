@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥖</text></svg>">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Boulanges Finder - POI le long de votre trace</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css">
@@ -44,12 +46,12 @@
             <label class="poi-checkbox">
               <input type="checkbox" name="poi-cafe" id="poi-cafe">
               <span class="poi-icon cafe">☕</span>
-              <span>Café</span>
+              <span>Cafés</span>
             </label>
             <label class="poi-checkbox">
               <input type="checkbox" name="poi-water" id="poi-water">
               <span class="poi-icon water">💧</span>
-              <span>Point d'eau</span>
+              <span>Points d'eau</span>
             </label>
             <label class="poi-checkbox">
               <input type="checkbox" name="poi-toilets" id="poi-toilets">
@@ -73,19 +75,14 @@
 
     <!-- Controls Panel -->
     <div class="controls-panel" id="controls-panel">
-      <button id="back-btn" class="back-btn">← Nouveau fichier</button>
-
-      <div class="stats" id="stats"></div>
-
-      <div class="export-section">
-        <h3>Export</h3>
-        <div class="export-buttons">
-          <button id="export-gpx" class="export-btn">GPX</button>
-          <button id="export-csv" class="export-btn">CSV</button>
-          <button id="export-json" class="export-btn">JSON</button>
-        </div>
-      </div>
+      <button id="back-btn" class="control-btn">←</button>
+      <button id="export-gpx" class="control-btn">GPX</button>
+      <button id="export-csv" class="control-btn">CSV</button>
+      <button id="export-json" class="control-btn">JSON</button>
     </div>
+
+    <!-- Geolocation Button -->
+    <button id="geoloc-btn" class="geoloc-btn" title="Ma position">📍</button>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

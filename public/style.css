@@ -219,158 +219,68 @@ body {
   height: 100%;
 }
 
-/* Mobile: Bottom sheet style panel */
+/* Compact controls bar */
 .controls-panel {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  border-radius: 20px 20px 0 0;
-  padding: 16px;
-  padding-bottom: calc(16px + env(safe-area-inset-bottom));
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  max-height: 50vh;
-  overflow-y: auto;
-  transition: transform 0.3s ease;
-}
-
-.controls-panel::before {
-  content: '';
-  display: block;
-  width: 40px;
-  height: 4px;
-  background: #ddd;
-  border-radius: 2px;
-  margin: 0 auto 12px;
-}
-
-.controls-panel.collapsed {
-  transform: translateY(calc(100% - 60px));
-}
-
-.back-btn {
-  background: #f0f0f0;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  margin-bottom: 12px;
-  transition: background 0.2s;
-  width: 100%;
-}
-
-.back-btn:hover,
-.back-btn:active {
-  background: #e0e0e0;
-}
-
-.stats {
-  background: #f8f9ff;
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  font-size: 0.85rem;
-  color: #666;
-  text-align: center;
-}
-
-.filters h3,
-.export-section h3 {
-  font-size: 0.9rem;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.filters-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.filter-item {
+  top: 10px;
+  right: 10px;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 8px;
-  cursor: pointer;
-  background: #f8f8f8;
-  border-radius: 10px;
-  transition: background 0.2s;
-  text-align: center;
-}
-
-.filter-item:has(input:checked) {
-  background: #f0f0ff;
-}
-
-.filter-item input {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-}
-
-.filter-item .filter-label {
-  font-size: 0.75rem;
-  color: #666;
-}
-
-.filter-item .filter-count {
-  font-weight: 600;
-  color: #333;
-}
-
-.marker-icon {
-  display: inline-block;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-}
-
-.marker-icon.bakery {
-  background: #f59e0b;
-}
-
-.marker-icon.cafe {
-  background: #8b5cf6;
-}
-
-.marker-icon.water {
-  background: #3b82f6;
-}
-
-.marker-icon.toilets {
-  background: #10b981;
-}
-
-.export-section {
-  padding-top: 12px;
-  border-top: 1px solid #eee;
-}
-
-.export-buttons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  z-index: 1000;
 }
 
-.export-btn {
-  padding: 10px 8px;
-  background: #f0f0f0;
+.control-btn {
+  background: white;
   border: none;
+  padding: 10px 14px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: background 0.2s, transform 0.1s;
 }
 
-.export-btn:hover,
-.export-btn:active {
-  background: #e0e0e0;
+.control-btn:hover {
+  background: #f5f5f5;
+}
+
+.control-btn:active {
+  transform: scale(0.95);
+}
+
+/* Geolocation button */
+.geoloc-btn {
+  position: absolute;
+  bottom: 30px;
+  right: 10px;
+  width: 44px;
+  height: 44px;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.geoloc-btn:hover {
+  background: #f5f5f5;
+}
+
+.geoloc-btn:active {
+  transform: scale(0.95);
+}
+
+.geoloc-btn.loading {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .hidden {
@@ -493,47 +403,4 @@ body {
     gap: 10px;
   }
 
-  .controls-panel {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    bottom: auto;
-    left: auto;
-    border-radius: 12px;
-    padding: 20px;
-    max-width: 300px;
-    max-height: calc(100vh - 40px);
-  }
-
-  .controls-panel::before {
-    display: none;
-  }
-
-  .back-btn {
-    width: auto;
-  }
-
-  .filters-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .filter-item {
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 8px;
-    padding: 8px 12px;
-  }
-
-  .filter-item .filter-label {
-    font-size: 0.85rem;
-  }
-
-  .export-buttons {
-    grid-template-columns: 1fr;
-  }
-
-  .export-btn {
-    font-size: 0.9rem;
-    padding: 10px;
-  }
 }

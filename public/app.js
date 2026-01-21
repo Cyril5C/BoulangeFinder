@@ -10,6 +10,7 @@ let poiLayers = {
 let currentData = null;
 let selectedPoiTypes = [];
 let userLocationMarker = null;
+let isOffline = !navigator.onLine;
 
 // DOM Elements
 const uploadSection = document.getElementById('upload-section');
@@ -56,7 +57,104 @@ if ('serviceWorker' in navigator) {
     .catch(err => console.log('SW registration failed:', err));
 }
 
-// LocalStorage cache functions
+// Offline/Online detection
+function updateOnlineStatus() {
+  isOffline = !navigator.onLine;
+  document.body.classList.toggle('offline', isOffline);
+
+  if (isOffline) {
+    showOfflineBanner();
+  } else {
+    hideOfflineBanner();
+  }
+}
+
+function showOfflineBanner() {
+  let banner = document.getElementById('offline-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'offline-banner';
+    banner.innerHTML = '📴 Mode hors ligne - Données en cache';
+    document.body.appendChild(banner);
+  }
+  banner.classList.add('visible');
+}
+
+function hideOfflineBanner() {
+  const banner = document.getElementById('offline-banner');
+  if (banner) {
+    banner.classList.remove('visible');
+  }
+}
+
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
+
+// IndexedDB for offline storage
+const DB_NAME = 'boulanges-finder';
+const DB_VERSION = 1;
+let db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('traces')) {
+        db.createObjectStore('traces', { keyPath: 'id' });
+      }
+    };
+  });
+}
+
+async function saveTrace(id, data) {
+  if (!db) await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('traces', 'readwrite');
+    const store = tx.objectStore('traces');
+    store.put({ id, data, timestamp: Date.now() });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadTrace(id) {
+  if (!db) await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('traces', 'readonly');
+    const store = tx.objectStore('traces');
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result?.data);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getLastTrace() {
+  if (!db) await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('traces', 'readonly');
+    const store = tx.objectStore('traces');
+    const request = store.openCursor(null, 'prev');
+    request.onsuccess = () => {
+      const cursor = request.result;
+      resolve(cursor ? cursor.value.data : null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Initialize DB
+openDB().catch(console.error);
+
+// LocalStorage cache functions (kept for backward compatibility)
 function saveToCache(key, data) {
   try {
     localStorage.setItem(key, JSON.stringify({
@@ -64,12 +162,15 @@ function saveToCache(key, data) {
       data: data
     }));
   } catch (e) {
-    console.warn('LocalStorage full, clearing old data');
-    localStorage.clear();
+    console.warn('LocalStorage full, clearing old gpx_ entries');
+    // Only clear gpx_ entries, not everything
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('gpx_')) localStorage.removeItem(k);
+    });
   }
 }
 
-function loadFromCache(key, maxAgeMs = 24 * 60 * 60 * 1000) {
+function loadFromCache(key, maxAgeMs = 7 * 24 * 60 * 60 * 1000) {
   try {
     const cached = localStorage.getItem(key);
     if (!cached) return null;
@@ -119,11 +220,27 @@ gpxForm.addEventListener('submit', async (e) => {
   const maxDetour = document.getElementById('max-detour').value;
   const cacheKey = getCacheKey(file, maxDetour, selectedPoiTypes);
 
-  // Check cache first
+  // Check localStorage cache first
   const cached = loadFromCache(cacheKey);
   if (cached) {
     currentData = cached;
     showMap(currentData);
+    return;
+  }
+
+  // If offline, try to load last trace from IndexedDB
+  if (isOffline) {
+    try {
+      const lastTrace = await getLastTrace();
+      if (lastTrace) {
+        currentData = lastTrace;
+        showMap(currentData);
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to load from IndexedDB:', e);
+    }
+    alert('Vous êtes hors ligne. Aucune donnée en cache disponible.');
     return;
   }
 
@@ -147,11 +264,32 @@ gpxForm.addEventListener('submit', async (e) => {
 
     currentData = await response.json();
 
-    // Save to cache
+    // Save to localStorage cache
     saveToCache(cacheKey, currentData);
+
+    // Save to IndexedDB for offline use
+    try {
+      await saveTrace(cacheKey, currentData);
+    } catch (e) {
+      console.error('Failed to save to IndexedDB:', e);
+    }
 
     showMap(currentData);
   } catch (error) {
+    // If network error and we have cached data, use it
+    if (error.message === 'Failed to fetch' || error.message === 'Hors ligne') {
+      try {
+        const lastTrace = await getLastTrace();
+        if (lastTrace) {
+          currentData = lastTrace;
+          showMap(currentData);
+          showOfflineBanner();
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load from IndexedDB:', e);
+      }
+    }
     alert(error.message);
   } finally {
     setLoading(false);
@@ -224,7 +362,7 @@ function createPopupContent(poi) {
 
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
-    <h4>${poi.name}</h4>
+    <h4>${escapeHtml(poi.name)}</h4>
     <p>Distance du parcours: ${poi.distance}m</p>`;
 
   if (poi.tags?.opening_hours) {
@@ -240,6 +378,12 @@ function createPopupContent(poi) {
 
   html += '</div>';
   return html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function navigateTo(destLat, destLon, app, name) {

@@ -5,7 +5,10 @@ const path = require('path');
 const router = express.Router();
 
 // File-based storage for shared maps
-const DATA_DIR = path.join(__dirname, '../../data/shares');
+// Use /data for Railway volume mount, fallback to local data/ for development
+const DATA_DIR = process.env.NODE_ENV === 'production'
+  ? '/data/shares'
+  : path.join(__dirname, '../../data/shares');
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {

@@ -57,6 +57,14 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// Public routes for shared maps (before auth middleware)
+app.get('/share/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/share.html'));
+});
+
+// Public API for reading shared maps
+app.use('/api/share', shareRoutes);
+
 // Auth middleware for all other routes
 app.use((req, res, next) => {
   // Allow service worker and manifest for PWA
@@ -82,12 +90,6 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes
 app.use('/api/gpx', gpxRoutes);
-app.use('/api/share', shareRoutes);
-
-// Shared map page (public with auth)
-app.get('/share/:id', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
 
 // Serve index.html for root
 app.get('/', (req, res) => {

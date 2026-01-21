@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥖</text></svg>">
+  <title>Carte partagée - Boulanges Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    #map {
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    .loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #667eea;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #e53e3e;
+      padding: 20px;
+    }
+
+    .map-footer {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: #666;
+      z-index: 1000;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .geoloc-btn {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      width: 44px;
+      height: 44px;
+      background: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+    }
+
+    .poi-popup h4 {
+      margin: 8px 0 4px;
+      font-size: 1rem;
+    }
+
+    .poi-popup p {
+      margin: 4px 0;
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    .poi-type {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    .poi-type.bakery { background: #f59e0b; }
+    .poi-type.cafe { background: #8b5cf6; }
+    .poi-type.water { background: #3b82f6; }
+    .poi-type.toilets { background: #10b981; }
+
+    .poi-nav-links {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+    }
+
+    .nav-link {
+      font-size: 0.8rem;
+      text-decoration: none;
+      color: #666;
+    }
+
+    .nav-link:hover {
+      color: #333;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading">
+    <div class="loading-spinner"></div>
+    <p>Chargement de la carte...</p>
+  </div>
+
+  <div id="error" class="error" style="display: none;">
+    <p>Carte non trouvée ou expirée</p>
+    <p style="margin-top: 16px;"><a href="/">Retour à l'accueil</a></p>
+  </div>
+
+  <div id="map" style="display: none;"></div>
+  <button id="geoloc-btn" class="geoloc-btn" title="Ma position" style="display: none;">📍</button>
+  <div class="map-footer" style="display: none;">Boulanges Finder made with ❤️ par Cyril</div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const icons = {
+      bakery: createIcon('#f59e0b', '🥖'),
+      cafe: createIcon('#8b5cf6', '☕'),
+      water: createIcon('#3b82f6', '💧'),
+      toilets: createIcon('#10b981', '🚻')
+    };
+
+    function createIcon(color, emoji) {
+      return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="
+          background: white;
+          border: 3px solid ${color};
+          border-radius: 50%;
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+        ">${emoji}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -15]
+      });
+    }
+
+    async function loadSharedMap() {
+      const path = window.location.pathname;
+      const match = path.match(/^\/share\/([a-zA-Z0-9_-]+)$/);
+
+      if (!match) {
+        showError();
+        return;
+      }
+
+      const shareId = match[1];
+
+      try {
+        const response = await fetch(`/api/share/${shareId}`);
+        if (!response.ok) {
+          showError();
+          return;
+        }
+
+        const data = await response.json();
+        showMap(data);
+      } catch (error) {
+        console.error('Failed to load shared map:', error);
+        showError();
+      }
+    }
+
+    function showError() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+    }
+
+    function showMap(data) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('map').style.display = 'block';
+      document.getElementById('geoloc-btn').style.display = 'block';
+      document.querySelector('.map-footer').style.display = 'block';
+
+      const map = L.map('map');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Draw track
+      const trackCoords = data.track.map(p => [p.lat, p.lon]);
+      const trackLayer = L.polyline(trackCoords, {
+        color: '#667eea',
+        weight: 4,
+        opacity: 0.8
+      }).addTo(map);
+
+      // Add POIs
+      const typeLabels = {
+        bakery: 'Boulangerie',
+        cafe: 'Bar / Café',
+        water: "Point d'eau",
+        toilets: 'Toilettes'
+      };
+
+      data.pois.forEach(poi => {
+        if (!icons[poi.type]) return;
+
+        const marker = L.marker([poi.lat, poi.lon], {
+          icon: icons[poi.type]
+        });
+
+        let html = `<div class="poi-popup">
+          <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
+          <h4>${escapeHtml(poi.name)}</h4>
+          <p>Distance du parcours: ${poi.distance}m</p>`;
+
+        if (poi.tags?.opening_hours) {
+          html += `<p>Horaires: ${formatOpeningHours(poi.tags.opening_hours)}</p>`;
+        }
+
+        html += `<div class="poi-nav-links">
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lon}&travelmode=bicycling" target="_blank" class="nav-link">Google Maps</a>
+          <a href="https://maps.apple.com/?daddr=${poi.lat},${poi.lon}&dirflg=w" target="_blank" class="nav-link">Apple Plans</a>
+        </div>`;
+
+        html += '</div>';
+        marker.bindPopup(html);
+        marker.addTo(map);
+      });
+
+      // Fit bounds
+      map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
+
+      // Geolocation
+      let userLocationMarker = null;
+      document.getElementById('geoloc-btn').addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          alert('Géolocalisation non supportée');
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+
+            if (userLocationMarker) {
+              map.removeLayer(userLocationMarker);
+            }
+
+            userLocationMarker = L.circleMarker([latitude, longitude], {
+              radius: 10,
+              fillColor: '#667eea',
+              color: '#fff',
+              weight: 3,
+              opacity: 1,
+              fillOpacity: 0.8
+            }).addTo(map);
+
+            userLocationMarker.bindPopup('Ma position').openPopup();
+            map.setView([latitude, longitude], 15);
+          },
+          () => {
+            alert('Impossible d\'obtenir votre position');
+          },
+          { timeout: 10000, maximumAge: 0 }
+        );
+      });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function formatOpeningHours(osmHours) {
+      if (!osmHours) return null;
+      if (osmHours === '24/7') return 'Ouvert 24h/24, 7j/7';
+
+      const dayNames = {
+        'Mo': 'Lun', 'Tu': 'Mar', 'We': 'Mer', 'Th': 'Jeu',
+        'Fr': 'Ven', 'Sa': 'Sam', 'Su': 'Dim', 'PH': 'Fériés'
+      };
+
+      let formatted = osmHours;
+      Object.entries(dayNames).forEach(([en, fr]) => {
+        formatted = formatted.replace(new RegExp(`\\b${en}\\b`, 'g'), fr);
+      });
+
+      return formatted
+        .replace(/off/gi, 'fermé')
+        .replace(/-/g, ' - ')
+        .replace(/,\s*/g, ', ')
+        .replace(/;\s*/g, '<br>')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    loadSharedMap();
+  </script>
+</body>
+</html>

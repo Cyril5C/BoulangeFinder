@@ -533,6 +533,7 @@ document.getElementById('share-btn').addEventListener('click', async () => {
     const response = await fetch('/api/share/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ data: currentData })
     });
 

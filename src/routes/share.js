@@ -21,8 +21,16 @@ router.post('/create', (req, res) => {
   try {
     const { data } = req.body;
 
-    if (!data || !data.track || !data.pois) {
-      return res.status(400).json({ error: 'Données invalides' });
+    console.log('Share create request received, body size:', JSON.stringify(req.body).length);
+
+    if (!data) {
+      console.log('No data in request body');
+      return res.status(400).json({ error: 'Données manquantes' });
+    }
+
+    if (!data.track || !data.pois) {
+      console.log('Missing track or pois:', { hasTrack: !!data.track, hasPois: !!data.pois });
+      return res.status(400).json({ error: 'Données invalides (track ou pois manquants)' });
     }
 
     // Generate unique ID

@@ -10,6 +10,7 @@ let poiLayers = {
 let currentData = null;
 let selectedPoiTypes = [];
 let userLocationMarker = null;
+let distanceMarkers = [];
 let isOffline = !navigator.onLine;
 
 // DOM Elements
@@ -345,6 +346,8 @@ function showMap(data) {
   Object.values(poiLayers).forEach(layer => {
     if (layer) map.removeLayer(layer);
   });
+  distanceMarkers.forEach(marker => map.removeLayer(marker));
+  distanceMarkers = [];
 
   // Draw track
   const trackCoords = data.track.map(p => [p.lat, p.lon]);
@@ -353,6 +356,9 @@ function showMap(data) {
     weight: 4,
     opacity: 0.8
   }).addTo(map);
+
+  // Add distance markers every 20km
+  addDistanceMarkers(data.track);
 
   // Create POI layers
   poiLayers.bakery = L.layerGroup();
@@ -599,6 +605,66 @@ function exportPOIs(format) {
 
 function getFilteredPOIs() {
   return currentData.pois;
+}
+
+// Add distance markers every 20km along the track
+function addDistanceMarkers(track) {
+  const intervalKm = 20;
+  let cumulativeDistance = 0;
+  let nextMarkerKm = 0;
+
+  // Add start marker (0 km)
+  addDistanceMarker(track[0].lat, track[0].lon, 0);
+  nextMarkerKm = intervalKm;
+
+  for (let i = 1; i < track.length; i++) {
+    const segmentDistance = haversineDistance(
+      track[i - 1].lat, track[i - 1].lon,
+      track[i].lat, track[i].lon
+    );
+
+    const prevCumulative = cumulativeDistance;
+    cumulativeDistance += segmentDistance / 1000; // Convert to km
+
+    // Check if we crossed a marker point
+    while (cumulativeDistance >= nextMarkerKm) {
+      // Interpolate position
+      const ratio = (nextMarkerKm - prevCumulative) / (cumulativeDistance - prevCumulative);
+      const lat = track[i - 1].lat + ratio * (track[i].lat - track[i - 1].lat);
+      const lon = track[i - 1].lon + ratio * (track[i].lon - track[i - 1].lon);
+
+      addDistanceMarker(lat, lon, nextMarkerKm);
+      nextMarkerKm += intervalKm;
+    }
+  }
+}
+
+function addDistanceMarker(lat, lon, km) {
+  const icon = L.divIcon({
+    className: 'distance-marker',
+    html: `<div class="distance-marker-inner">${km}</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+
+  const marker = L.marker([lat, lon], { icon }).addTo(map);
+  marker.bindTooltip(`${km} km`, { permanent: false, direction: 'top' });
+  distanceMarkers.push(marker);
+}
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius in meters
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRad(deg) {
+  return deg * Math.PI / 180;
 }
 
 function generateGPX(pois) {

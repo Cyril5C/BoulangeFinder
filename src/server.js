@@ -26,20 +26,7 @@ app.use(session({
   }
 }));
 
-// Auth middleware
-function requireAuth(req, res, next) {
-  if (req.session.authenticated) {
-    return next();
-  }
-  // Allow login page and API
-  if (req.path === '/login' || req.path === '/api/login') {
-    return next();
-  }
-  // Redirect to login
-  res.redirect('/login');
-}
-
-// Login page
+// Login page (public)
 app.get('/login', (req, res) => {
   if (req.session.authenticated) {
     return res.redirect('/');
@@ -47,7 +34,7 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
 });
 
-// Login API
+// Login API (public)
 app.post('/api/login', (req, res) => {
   const { password } = req.body;
 
@@ -65,8 +52,27 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// Auth middleware for all other routes
+app.use((req, res, next) => {
+  // Allow service worker and manifest for PWA
+  if (req.path === '/sw.js' || req.path === '/manifest.json') {
+    return next();
+  }
+
+  if (req.session.authenticated) {
+    return next();
+  }
+
+  // For API requests, return 401
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ error: 'Non authentifié' });
+  }
+
+  // Redirect to login
+  res.redirect('/login');
+});
+
 // Protected static files
-app.use(requireAuth);
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes

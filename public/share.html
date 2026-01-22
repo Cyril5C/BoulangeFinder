@@ -331,7 +331,8 @@
           <p>Distance du parcours: ${poi.distance}m</p>`;
 
         if (poi.tags?.opening_hours) {
-          html += `<p>Horaires: ${formatOpeningHours(poi.tags.opening_hours)}</p>`;
+          const hours = formatOpeningHours(poi.tags.opening_hours);
+          html += `<p>Horaires: ${escapeHtml(hours).replace(/&lt;br&gt;/g, '<br>')}</p>`;
         }
 
         html += `<div class="poi-nav-links">

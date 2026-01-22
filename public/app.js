@@ -410,7 +410,7 @@ function createPopupContent(poi) {
 
   if (poi.tags?.opening_hours) {
     const hours = formatOpeningHours(poi.tags.opening_hours);
-    html += `<p>Horaires: ${hours}</p>`;
+    html += `<p>Horaires: ${escapeHtml(hours).replace(/&lt;br&gt;/g, '<br>')}</p>`;
   }
 
   html += `<div class="poi-nav-links">

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
+const rateLimit = require('express-rate-limit');
 const gpxRoutes = require('./routes/gpx');
 const shareRoutes = require('./routes/share');
 
@@ -39,8 +40,17 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
 });
 
+// Rate limiter for login attempts (brute force protection)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per window
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // Login API (public)
-app.post('/api/login', (req, res) => {
+app.post('/api/login', loginLimiter, (req, res) => {
   const { password } = req.body;
 
   if (password === APP_PASSWORD) {

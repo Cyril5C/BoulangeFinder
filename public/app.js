@@ -599,13 +599,16 @@ function applyOpenNowFilter() {
     // Water and toilets are always "open"
     if (type === 'water' || type === 'toilets') return;
 
+    // If no opening hours, keep visible (unknown = show)
+    if (!poi.tags?.opening_hours) return;
+
     // Use pre-computed isOpenNow from server if it's a boolean, otherwise fallback to client-side parsing
     let isOpen;
     if (typeof poi.isOpenNow === 'boolean') {
       isOpen = poi.isOpenNow;
     } else {
-      // Server couldn't determine (null) or field missing - use client-side parser
-      isOpen = isOpenNow(poi.tags?.opening_hours);
+      // Server couldn't determine (null) - use client-side parser
+      isOpen = isOpenNow(poi.tags.opening_hours);
     }
 
     if (!isOpen) {

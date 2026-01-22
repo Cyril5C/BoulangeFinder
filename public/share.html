@@ -335,12 +335,14 @@
         if (filterOpenNow) {
           allPoiMarkers.forEach(({ marker, poi, type }) => {
             if (type === 'water' || type === 'toilets') return;
+            // If no opening hours, keep visible (unknown = show)
+            if (!poi.tags?.opening_hours) return;
             // Use server-computed isOpenNow if boolean, otherwise fallback to client parser
             let isOpen;
             if (typeof poi.isOpenNow === 'boolean') {
               isOpen = poi.isOpenNow;
             } else {
-              isOpen = isOpenNow(poi.tags?.opening_hours);
+              isOpen = isOpenNow(poi.tags.opening_hours);
             }
             if (!isOpen) {
               poiLayers[type].removeLayer(marker);

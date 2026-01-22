@@ -335,7 +335,14 @@
         if (filterOpenNow) {
           allPoiMarkers.forEach(({ marker, poi, type }) => {
             if (type === 'water' || type === 'toilets') return;
-            if (!isOpenNow(poi.tags?.opening_hours)) {
+            // Use server-computed isOpenNow if boolean, otherwise fallback to client parser
+            let isOpen;
+            if (typeof poi.isOpenNow === 'boolean') {
+              isOpen = poi.isOpenNow;
+            } else {
+              isOpen = isOpenNow(poi.tags?.opening_hours);
+            }
+            if (!isOpen) {
               poiLayers[type].removeLayer(marker);
             }
           });
@@ -486,50 +493,59 @@
       for (const rule of rules) {
         if (rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
 
-        const match = rule.match(/^(?:([A-Za-z,\-\s]+)\s+)?(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-        if (!match) continue;
+        // Split day part from time part
+        const dayTimeMatch = rule.match(/^([A-Za-z,\-\s]+)?\s*(.+)$/);
+        if (!dayTimeMatch) continue;
 
-        const [, dayPart, startTime, endTime] = match;
+        const [, dayPart, timePart] = dayTimeMatch;
         let dayMatches = false;
 
-        if (!dayPart) {
+        if (!dayPart || !dayPart.trim()) {
           dayMatches = true;
         } else {
           const daySpec = dayPart.trim();
-          if (daySpec.includes('-')) {
-            const rangeParts = daySpec.split('-');
-            if (rangeParts.length === 2) {
-              const startDay = rangeParts[0].trim();
-              const endDay = rangeParts[1].trim();
-              const startIdx = osmDays.indexOf(startDay);
-              const endIdx = osmDays.indexOf(endDay);
-              if (startIdx !== -1 && endIdx !== -1) {
-                const todayIdx = osmDays.indexOf(todayOsm);
-                if (startIdx <= endIdx) {
-                  dayMatches = todayIdx >= startIdx && todayIdx <= endIdx;
-                } else {
-                  dayMatches = todayIdx >= startIdx || todayIdx <= endIdx;
-                }
+          // Handle day ranges like "Mo-Fr" or "Tu-Su"
+          const rangeMatch = daySpec.match(/^([A-Za-z]{2})-([A-Za-z]{2})$/);
+          if (rangeMatch) {
+            const startDay = rangeMatch[1];
+            const endDay = rangeMatch[2];
+            const startIdx = osmDays.indexOf(startDay);
+            const endIdx = osmDays.indexOf(endDay);
+            if (startIdx !== -1 && endIdx !== -1) {
+              const todayIdx = osmDays.indexOf(todayOsm);
+              if (startIdx <= endIdx) {
+                dayMatches = todayIdx >= startIdx && todayIdx <= endIdx;
+              } else {
+                dayMatches = todayIdx >= startIdx || todayIdx <= endIdx;
               }
             }
           } else if (daySpec.includes(',')) {
             const days = daySpec.split(',').map(d => d.trim());
             dayMatches = days.includes(todayOsm);
-          } else {
+          } else if (osmDays.includes(daySpec)) {
             dayMatches = daySpec === todayOsm;
           }
         }
 
-        if (dayMatches) {
-          const [startH, startM] = startTime.split(':').map(Number);
-          const [endH, endM] = endTime.split(':').map(Number);
-          const startMinutes = startH * 60 + startM;
-          const endMinutes = endH * 60 + endM;
+        if (dayMatches && timePart) {
+          // Handle multiple time ranges separated by comma: "07:30-13:30,15:30-20:00"
+          const timeRanges = timePart.split(',').map(t => t.trim());
 
-          if (endMinutes < startMinutes) {
-            if (currentMinutes >= startMinutes || currentMinutes < endMinutes) return true;
-          } else {
-            if (currentMinutes >= startMinutes && currentMinutes < endMinutes) return true;
+          for (const timeRange of timeRanges) {
+            const timeMatch = timeRange.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+            if (!timeMatch) continue;
+
+            const [, startTime, endTime] = timeMatch;
+            const [startH, startM] = startTime.split(':').map(Number);
+            const [endH, endM] = endTime.split(':').map(Number);
+            const startMinutes = startH * 60 + startM;
+            const endMinutes = endH * 60 + endM;
+
+            if (endMinutes < startMinutes) {
+              if (currentMinutes >= startMinutes || currentMinutes < endMinutes) return true;
+            } else {
+              if (currentMinutes >= startMinutes && currentMinutes < endMinutes) return true;
+            }
           }
         }
       }

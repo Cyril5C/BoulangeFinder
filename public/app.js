@@ -599,8 +599,15 @@ function applyOpenNowFilter() {
     // Water and toilets are always "open"
     if (type === 'water' || type === 'toilets') return;
 
-    // Use pre-computed isOpenNow from server, fallback to client-side parsing
-    const isOpen = poi.isOpenNow !== undefined ? poi.isOpenNow : isOpenNow(poi.tags?.opening_hours);
+    // Use pre-computed isOpenNow from server if it's a boolean, otherwise fallback to client-side parsing
+    let isOpen;
+    if (typeof poi.isOpenNow === 'boolean') {
+      isOpen = poi.isOpenNow;
+    } else {
+      // Server couldn't determine (null) or field missing - use client-side parser
+      isOpen = isOpenNow(poi.tags?.opening_hours);
+    }
+
     if (!isOpen) {
       poiLayers[type].removeLayer(marker);
     }
@@ -801,44 +808,44 @@ function isOpenNow(openingHours) {
   // "Mo-Fr 07:00-19:00"
   // "Mo-Fr 07:00-19:00; Sa 08:00-18:00"
   // "Mo,Tu,We,Th,Fr 07:00-19:00"
+  // "Tu-Su 07:30-13:30,15:30-20:00" (multiple time ranges)
 
   const rules = openingHours.split(';').map(r => r.trim());
 
   for (const rule of rules) {
     if (rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
 
+    // Split day part from time part
     // Match patterns like "Mo-Fr 07:00-19:00" or "Mo 07:00-19:00" or "07:00-19:00"
-    const match = rule.match(/^(?:([A-Za-z,\-\s]+)\s+)?(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-    if (!match) continue;
+    const dayTimeMatch = rule.match(/^([A-Za-z,\-\s]+)?\s*(.+)$/);
+    if (!dayTimeMatch) continue;
 
-    const [, dayPart, startTime, endTime] = match;
+    const [, dayPart, timePart] = dayTimeMatch;
 
     // Check if today matches the day specification
     let dayMatches = false;
 
-    if (!dayPart) {
+    if (!dayPart || !dayPart.trim()) {
       // No day specified = applies every day
       dayMatches = true;
     } else {
       const daySpec = dayPart.trim();
 
-      // Handle day ranges like "Mo-Fr"
-      if (daySpec.includes('-')) {
-        const rangeParts = daySpec.split('-');
-        if (rangeParts.length === 2) {
-          const startDay = rangeParts[0].trim();
-          const endDay = rangeParts[1].trim();
-          const startIdx = osmDays.indexOf(startDay);
-          const endIdx = osmDays.indexOf(endDay);
+      // Handle day ranges like "Mo-Fr" or "Tu-Su"
+      const rangeMatch = daySpec.match(/^([A-Za-z]{2})-([A-Za-z]{2})$/);
+      if (rangeMatch) {
+        const startDay = rangeMatch[1];
+        const endDay = rangeMatch[2];
+        const startIdx = osmDays.indexOf(startDay);
+        const endIdx = osmDays.indexOf(endDay);
 
-          if (startIdx !== -1 && endIdx !== -1) {
-            const todayIdx = osmDays.indexOf(todayOsm);
-            if (startIdx <= endIdx) {
-              dayMatches = todayIdx >= startIdx && todayIdx <= endIdx;
-            } else {
-              // Wrap around (e.g., Fr-Mo)
-              dayMatches = todayIdx >= startIdx || todayIdx <= endIdx;
-            }
+        if (startIdx !== -1 && endIdx !== -1) {
+          const todayIdx = osmDays.indexOf(todayOsm);
+          if (startIdx <= endIdx) {
+            dayMatches = todayIdx >= startIdx && todayIdx <= endIdx;
+          } else {
+            // Wrap around (e.g., Fr-Mo or Tu-Su where Su < Tu)
+            dayMatches = todayIdx >= startIdx || todayIdx <= endIdx;
           }
         }
       }
@@ -848,26 +855,36 @@ function isOpenNow(openingHours) {
         dayMatches = days.includes(todayOsm);
       }
       // Single day
-      else {
+      else if (osmDays.includes(daySpec)) {
         dayMatches = daySpec === todayOsm;
       }
     }
 
-    if (dayMatches) {
-      // Parse times
-      const [startH, startM] = startTime.split(':').map(Number);
-      const [endH, endM] = endTime.split(':').map(Number);
-      const startMinutes = startH * 60 + startM;
-      const endMinutes = endH * 60 + endM;
+    if (dayMatches && timePart) {
+      // Handle multiple time ranges separated by comma: "07:30-13:30,15:30-20:00"
+      const timeRanges = timePart.split(',').map(t => t.trim());
 
-      // Handle overnight hours (e.g., 22:00-02:00)
-      if (endMinutes < startMinutes) {
-        if (currentMinutes >= startMinutes || currentMinutes < endMinutes) {
-          return true;
-        }
-      } else {
-        if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
-          return true;
+      for (const timeRange of timeRanges) {
+        const timeMatch = timeRange.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+        if (!timeMatch) continue;
+
+        const [, startTime, endTime] = timeMatch;
+
+        // Parse times
+        const [startH, startM] = startTime.split(':').map(Number);
+        const [endH, endM] = endTime.split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+
+        // Handle overnight hours (e.g., 22:00-02:00)
+        if (endMinutes < startMinutes) {
+          if (currentMinutes >= startMinutes || currentMinutes < endMinutes) {
+            return true;
+          }
+        } else {
+          if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+            return true;
+          }
         }
       }
     }

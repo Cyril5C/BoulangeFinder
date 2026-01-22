@@ -1,4 +1,5 @@
 const { getBoundingBox, simplifyTrack } = require('../utils/geo');
+const OpeningHours = require('opening_hours');
 
 // Multiple Overpass API endpoints for fallback
 const OVERPASS_ENDPOINTS = [
@@ -127,14 +128,32 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
     const minDistance = getMinDistanceToTrack(element.lat, element.lon, trackPoints);
 
     if (minDistance <= maxDistance) {
+      const poiType = getPOIType(element.tags);
+      const openingHoursStr = element.tags?.opening_hours;
+
+      // Check if open now using the opening_hours library
+      let isOpenNow = null; // null = unknown
+      if (poiType === 'water' || poiType === 'toilets') {
+        isOpenNow = true; // Always considered "open"
+      } else if (openingHoursStr) {
+        try {
+          const oh = new OpeningHours(openingHoursStr, { lat: element.lat, lon: element.lon, address: { country_code: 'fr' } });
+          isOpenNow = oh.getState();
+        } catch (e) {
+          // Invalid opening_hours format - leave as unknown
+          isOpenNow = null;
+        }
+      }
+
       pois.push({
         id: element.id,
         lat: element.lat,
         lon: element.lon,
-        type: getPOIType(element.tags),
+        type: poiType,
         name: element.tags?.name || getDefaultName(element.tags),
         distance: Math.round(minDistance),
-        tags: element.tags
+        tags: element.tags,
+        isOpenNow
       });
     }
   }

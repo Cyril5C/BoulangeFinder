@@ -599,7 +599,8 @@ function applyOpenNowFilter() {
     // Water and toilets are always "open"
     if (type === 'water' || type === 'toilets') return;
 
-    const isOpen = isOpenNow(poi.tags?.opening_hours);
+    // Use pre-computed isOpenNow from server, fallback to client-side parsing
+    const isOpen = poi.isOpenNow !== undefined ? poi.isOpenNow : isOpenNow(poi.tags?.opening_hours);
     if (!isOpen) {
       poiLayers[type].removeLayer(marker);
     }

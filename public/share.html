@@ -111,6 +111,21 @@
       color: white;
     }
 
+    .day-select {
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 24px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      cursor: pointer;
+    }
+
+    .day-select:focus {
+      outline: 2px solid #667eea;
+      outline-offset: 1px;
+    }
+
     .poi-popup h4 {
       margin: 8px 0 4px;
       font-size: 1rem;
@@ -189,7 +204,17 @@
 
   <div id="map" style="display: none;"></div>
   <div class="controls-panel" style="display: none;">
-    <button id="open-now-btn" class="control-btn toggle-btn" title="Afficher uniquement les établissements ouverts">Ouvert</button>
+    <select id="day-filter" class="control-btn day-select" title="Filtrer par jour d'ouverture">
+      <option value="">Tous</option>
+      <option value="now">Ouvert maintenant</option>
+      <option value="Mo">Lundi</option>
+      <option value="Tu">Mardi</option>
+      <option value="We">Mercredi</option>
+      <option value="Th">Jeudi</option>
+      <option value="Fr">Vendredi</option>
+      <option value="Sa">Samedi</option>
+      <option value="Su">Dimanche</option>
+    </select>
   </div>
   <button id="geoloc-btn" class="geoloc-btn" title="Ma position" style="display: none;">📍</button>
   <div class="map-footer" style="display: none;">Boulanges Finder made with ❤️ par Cyril</div>
@@ -326,36 +351,56 @@
       // Fit bounds
       map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
 
-      // Open now filter toggle
-      document.getElementById('open-now-btn').addEventListener('click', () => {
-        const btn = document.getElementById('open-now-btn');
-        filterOpenNow = !filterOpenNow;
-        btn.classList.toggle('active', filterOpenNow);
+      // Day filter change
+      let filterDay = '';
+      document.getElementById('day-filter').addEventListener('change', (e) => {
+        filterDay = e.target.value;
+        applyDayFilter();
+      });
 
-        if (filterOpenNow) {
-          allPoiMarkers.forEach(({ marker, poi, type }) => {
-            if (type === 'water' || type === 'toilets') return;
-            // If no opening hours, keep visible (unknown = show)
-            if (!poi.tags?.opening_hours) return;
-            // Use server-computed isOpenNow if boolean, otherwise fallback to client parser
-            let isOpen;
+      function applyDayFilter() {
+        allPoiMarkers.forEach(({ marker, poi, type }) => {
+          if (type === 'water' || type === 'toilets') {
+            if (!poiLayers[type].hasLayer(marker)) {
+              poiLayers[type].addLayer(marker);
+            }
+            return;
+          }
+
+          if (!filterDay) {
+            if (!poiLayers[type].hasLayer(marker)) {
+              poiLayers[type].addLayer(marker);
+            }
+            return;
+          }
+
+          if (!poi.tags?.opening_hours) {
+            if (!poiLayers[type].hasLayer(marker)) {
+              poiLayers[type].addLayer(marker);
+            }
+            return;
+          }
+
+          let isOpen;
+          if (filterDay === 'now') {
             if (typeof poi.isOpenNow === 'boolean') {
               isOpen = poi.isOpenNow;
             } else {
               isOpen = isOpenNow(poi.tags.opening_hours);
             }
-            if (!isOpen) {
-              poiLayers[type].removeLayer(marker);
-            }
-          });
-        } else {
-          allPoiMarkers.forEach(({ marker, type }) => {
+          } else {
+            isOpen = isOpenOnDay(poi.tags.opening_hours, filterDay);
+          }
+
+          if (isOpen) {
             if (!poiLayers[type].hasLayer(marker)) {
               poiLayers[type].addLayer(marker);
             }
-          });
-        }
-      });
+          } else {
+            poiLayers[type].removeLayer(marker);
+          }
+        });
+      }
 
       // Geolocation
       let userLocationMarker = null;
@@ -477,6 +522,60 @@
 
     function toRad(deg) {
       return deg * Math.PI / 180;
+    }
+
+    // Check if a POI is open on a specific day
+    function isOpenOnDay(openingHours, targetDay) {
+      if (!openingHours) return false;
+      if (openingHours === '24/7') return true;
+
+      const osmDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+      const targetIdx = osmDays.indexOf(targetDay);
+      if (targetIdx === -1) return false;
+
+      const rules = openingHours.split(';').map(r => r.trim());
+
+      for (const rule of rules) {
+        if (rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
+
+        const dayTimeMatch = rule.match(/^([A-Za-z,\-\s]+)?\s*(.+)$/);
+        if (!dayTimeMatch) continue;
+
+        const [, dayPart, timePart] = dayTimeMatch;
+        let dayMatches = false;
+
+        if (!dayPart || !dayPart.trim()) {
+          dayMatches = true;
+        } else {
+          const daySpec = dayPart.trim();
+          const rangeMatch = daySpec.match(/^([A-Za-z]{2})-([A-Za-z]{2})$/);
+          if (rangeMatch) {
+            const startIdx = osmDays.indexOf(rangeMatch[1]);
+            const endIdx = osmDays.indexOf(rangeMatch[2]);
+            if (startIdx !== -1 && endIdx !== -1) {
+              if (startIdx <= endIdx) {
+                dayMatches = targetIdx >= startIdx && targetIdx <= endIdx;
+              } else {
+                dayMatches = targetIdx >= startIdx || targetIdx <= endIdx;
+              }
+            }
+          } else if (daySpec.includes(',')) {
+            dayMatches = daySpec.split(',').map(d => d.trim()).includes(targetDay);
+          } else if (osmDays.includes(daySpec)) {
+            dayMatches = daySpec === targetDay;
+          }
+        }
+
+        if (dayMatches && timePart) {
+          const timeRanges = timePart.split(',').map(t => t.trim());
+          for (const timeRange of timeRanges) {
+            if (timeRange.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/)) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
     }
 
     // Check if a POI is currently open based on OSM opening_hours

@@ -12,7 +12,7 @@ let selectedPoiTypes = [];
 let userLocationMarker = null;
 let distanceMarkers = [];
 let isOffline = !navigator.onLine;
-let filterOpenNow = false;
+let filterDay = ''; // '', 'now', 'Mo', 'Tu', etc.
 let allPoiMarkers = [];
 
 // DOM Elements
@@ -387,8 +387,8 @@ function showMap(data) {
   Object.values(poiLayers).forEach(layer => layer.addTo(map));
 
   // Apply filter if active
-  if (filterOpenNow) {
-    applyOpenNowFilter();
+  if (filterDay) {
+    applyDayFilter();
   }
 
   // Fit bounds
@@ -581,46 +581,57 @@ document.getElementById('share-btn').addEventListener('click', async () => {
   }
 });
 
-// Open now filter toggle
-document.getElementById('open-now-btn').addEventListener('click', () => {
-  const btn = document.getElementById('open-now-btn');
-  filterOpenNow = !filterOpenNow;
-  btn.classList.toggle('active', filterOpenNow);
-
-  if (filterOpenNow) {
-    applyOpenNowFilter();
-  } else {
-    removeOpenNowFilter();
-  }
+// Day filter change
+document.getElementById('day-filter').addEventListener('change', (e) => {
+  filterDay = e.target.value;
+  applyDayFilter();
 });
 
-function applyOpenNowFilter() {
+function applyDayFilter() {
   allPoiMarkers.forEach(({ marker, poi, type }) => {
     // Water and toilets are always "open"
-    if (type === 'water' || type === 'toilets') return;
+    if (type === 'water' || type === 'toilets') {
+      if (!poiLayers[type].hasLayer(marker)) {
+        poiLayers[type].addLayer(marker);
+      }
+      return;
+    }
+
+    // No filter = show all
+    if (!filterDay) {
+      if (!poiLayers[type].hasLayer(marker)) {
+        poiLayers[type].addLayer(marker);
+      }
+      return;
+    }
 
     // If no opening hours, keep visible (unknown = show)
-    if (!poi.tags?.opening_hours) return;
+    if (!poi.tags?.opening_hours) {
+      if (!poiLayers[type].hasLayer(marker)) {
+        poiLayers[type].addLayer(marker);
+      }
+      return;
+    }
 
-    // Use pre-computed isOpenNow from server if it's a boolean, otherwise fallback to client-side parsing
     let isOpen;
-    if (typeof poi.isOpenNow === 'boolean') {
-      isOpen = poi.isOpenNow;
+    if (filterDay === 'now') {
+      // Use pre-computed isOpenNow from server if boolean, otherwise fallback to client parser
+      if (typeof poi.isOpenNow === 'boolean') {
+        isOpen = poi.isOpenNow;
+      } else {
+        isOpen = isOpenNow(poi.tags.opening_hours);
+      }
     } else {
-      // Server couldn't determine (null) - use client-side parser
-      isOpen = isOpenNow(poi.tags.opening_hours);
+      // Check if open on specific day
+      isOpen = isOpenOnDay(poi.tags.opening_hours, filterDay);
     }
 
-    if (!isOpen) {
+    if (isOpen) {
+      if (!poiLayers[type].hasLayer(marker)) {
+        poiLayers[type].addLayer(marker);
+      }
+    } else {
       poiLayers[type].removeLayer(marker);
-    }
-  });
-}
-
-function removeOpenNowFilter() {
-  allPoiMarkers.forEach(({ marker, type }) => {
-    if (!poiLayers[type].hasLayer(marker)) {
-      poiLayers[type].addLayer(marker);
     }
   });
 }
@@ -791,6 +802,76 @@ function formatOpeningHours(osmHours) {
     .trim();
 
   return formatted;
+}
+
+// Check if a POI is open on a specific day (any time during that day)
+function isOpenOnDay(openingHours, targetDay) {
+  if (!openingHours) return false;
+  if (openingHours === '24/7') return true;
+
+  const osmDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const targetIdx = osmDays.indexOf(targetDay);
+  if (targetIdx === -1) return false;
+
+  const rules = openingHours.split(';').map(r => r.trim());
+
+  for (const rule of rules) {
+    if (rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
+
+    // Split day part from time part
+    const dayTimeMatch = rule.match(/^([A-Za-z,\-\s]+)?\s*(.+)$/);
+    if (!dayTimeMatch) continue;
+
+    const [, dayPart, timePart] = dayTimeMatch;
+
+    // Check if target day matches
+    let dayMatches = false;
+
+    if (!dayPart || !dayPart.trim()) {
+      dayMatches = true;
+    } else {
+      const daySpec = dayPart.trim();
+
+      // Handle day ranges like "Mo-Fr" or "Tu-Su"
+      const rangeMatch = daySpec.match(/^([A-Za-z]{2})-([A-Za-z]{2})$/);
+      if (rangeMatch) {
+        const startDay = rangeMatch[1];
+        const endDay = rangeMatch[2];
+        const startIdx = osmDays.indexOf(startDay);
+        const endIdx = osmDays.indexOf(endDay);
+
+        if (startIdx !== -1 && endIdx !== -1) {
+          if (startIdx <= endIdx) {
+            dayMatches = targetIdx >= startIdx && targetIdx <= endIdx;
+          } else {
+            dayMatches = targetIdx >= startIdx || targetIdx <= endIdx;
+          }
+        }
+      }
+      // Handle comma-separated days
+      else if (daySpec.includes(',')) {
+        const days = daySpec.split(',').map(d => d.trim());
+        dayMatches = days.includes(targetDay);
+      }
+      // Single day
+      else if (osmDays.includes(daySpec)) {
+        dayMatches = daySpec === targetDay;
+      }
+    }
+
+    // If day matches and there's a time part (not "off"), it's open that day
+    if (dayMatches && timePart) {
+      const timeRanges = timePart.split(',').map(t => t.trim());
+      for (const timeRange of timeRanges) {
+        const timeMatch = timeRange.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+        if (timeMatch) {
+          return true; // Has valid opening hours on this day
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 // Check if a POI is currently open based on OSM opening_hours

@@ -816,55 +816,61 @@ function isOpenOnDay(openingHours, targetDay) {
   const rules = openingHours.split(';').map(r => r.trim());
 
   for (const rule of rules) {
-    if (rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
+    // Skip empty rules, "off", "closed", or rules with year dates (vacation periods)
+    if (!rule || rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
+    if (/\d{4}/.test(rule)) continue; // Skip rules with year (e.g., "2025 Jul 27...")
 
-    // Split day part from time part
-    const dayTimeMatch = rule.match(/^([A-Za-z,\-\s]+)?\s*(.+)$/);
-    if (!dayTimeMatch) continue;
+    // Match pattern: optional day spec, then time range(s)
+    // Day spec can be: Mo-Fr, Tu, Mo,We,Fr, etc.
+    const match = rule.match(/^([A-Za-z]{2}(?:-[A-Za-z]{2})?(?:,[A-Za-z]{2}(?:-[A-Za-z]{2})?)*)\s+(.+)$/);
 
-    const [, dayPart, timePart] = dayTimeMatch;
+    let dayPart = null;
+    let timePart = rule;
+
+    if (match) {
+      dayPart = match[1];
+      timePart = match[2];
+    }
 
     // Check if target day matches
     let dayMatches = false;
 
-    if (!dayPart || !dayPart.trim()) {
+    if (!dayPart) {
+      // No day specified = applies every day
       dayMatches = true;
     } else {
-      const daySpec = dayPart.trim();
+      // Handle multiple day specs separated by comma (e.g., "Mo-Fr,Su")
+      const daySpecs = dayPart.split(',');
 
-      // Handle day ranges like "Mo-Fr" or "Tu-Su"
-      const rangeMatch = daySpec.match(/^([A-Za-z]{2})-([A-Za-z]{2})$/);
-      if (rangeMatch) {
-        const startDay = rangeMatch[1];
-        const endDay = rangeMatch[2];
-        const startIdx = osmDays.indexOf(startDay);
-        const endIdx = osmDays.indexOf(endDay);
+      for (const spec of daySpecs) {
+        // Handle day ranges like "Mo-Fr" or "Tu-Su"
+        const rangeMatch = spec.match(/^([A-Za-z]{2})-([A-Za-z]{2})$/);
+        if (rangeMatch) {
+          const startIdx = osmDays.indexOf(rangeMatch[1]);
+          const endIdx = osmDays.indexOf(rangeMatch[2]);
 
-        if (startIdx !== -1 && endIdx !== -1) {
-          if (startIdx <= endIdx) {
-            dayMatches = targetIdx >= startIdx && targetIdx <= endIdx;
-          } else {
-            dayMatches = targetIdx >= startIdx || targetIdx <= endIdx;
+          if (startIdx !== -1 && endIdx !== -1) {
+            if (startIdx <= endIdx) {
+              if (targetIdx >= startIdx && targetIdx <= endIdx) dayMatches = true;
+            } else {
+              if (targetIdx >= startIdx || targetIdx <= endIdx) dayMatches = true;
+            }
           }
         }
-      }
-      // Handle comma-separated days
-      else if (daySpec.includes(',')) {
-        const days = daySpec.split(',').map(d => d.trim());
-        dayMatches = days.includes(targetDay);
-      }
-      // Single day
-      else if (osmDays.includes(daySpec)) {
-        dayMatches = daySpec === targetDay;
+        // Single day
+        else if (osmDays.includes(spec)) {
+          if (spec === targetDay) dayMatches = true;
+        }
       }
     }
 
-    // If day matches and there's a time part (not "off"), it's open that day
+    // If day matches and there's a valid time part, it's open that day
     if (dayMatches && timePart) {
-      const timeRanges = timePart.split(',').map(t => t.trim());
+      // Normalize different dash types and check for time pattern
+      const normalizedTime = timePart.replace(/[–—]/g, '-');
+      const timeRanges = normalizedTime.split(',').map(t => t.trim());
       for (const timeRange of timeRanges) {
-        const timeMatch = timeRange.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-        if (timeMatch) {
+        if (timeRange.match(/^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$/)) {
           return true; // Has valid opening hours on this day
         }
       }

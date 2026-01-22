@@ -249,6 +249,11 @@ body {
   transform: scale(0.95);
 }
 
+.control-btn.toggle-btn.active {
+  background: #10b981;
+  color: white;
+}
+
 /* Geolocation button */
 .geoloc-btn {
   position: absolute;

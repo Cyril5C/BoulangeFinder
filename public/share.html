@@ -88,6 +88,29 @@
       z-index: 1000;
     }
 
+    .controls-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+    }
+
+    .control-btn {
+      background: white;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .control-btn.toggle-btn.active {
+      background: #10b981;
+      color: white;
+    }
+
     .poi-popup h4 {
       margin: 8px 0 4px;
       font-size: 1rem;
@@ -165,6 +188,9 @@
   </div>
 
   <div id="map" style="display: none;"></div>
+  <div class="controls-panel" style="display: none;">
+    <button id="open-now-btn" class="control-btn toggle-btn" title="Afficher uniquement les établissements ouverts">Ouvert</button>
+  </div>
   <button id="geoloc-btn" class="geoloc-btn" title="Ma position" style="display: none;">📍</button>
   <div class="map-footer" style="display: none;">Boulanges Finder made with ❤️ par Cyril</div>
 
@@ -233,8 +259,17 @@
       document.getElementById('map').style.display = 'block';
       document.getElementById('geoloc-btn').style.display = 'block';
       document.querySelector('.map-footer').style.display = 'block';
+      document.querySelector('.controls-panel').style.display = 'block';
 
       const map = L.map('map');
+      let filterOpenNow = false;
+      const allPoiMarkers = [];
+      const poiLayers = {
+        bakery: L.layerGroup(),
+        cafe: L.layerGroup(),
+        water: L.layerGroup(),
+        toilets: L.layerGroup()
+      };
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
@@ -281,11 +316,37 @@
 
         html += '</div>';
         marker.bindPopup(html);
-        marker.addTo(map);
+        allPoiMarkers.push({ marker, poi, type: poi.type });
+        poiLayers[poi.type].addLayer(marker);
       });
+
+      // Add layers to map
+      Object.values(poiLayers).forEach(layer => layer.addTo(map));
 
       // Fit bounds
       map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
+
+      // Open now filter toggle
+      document.getElementById('open-now-btn').addEventListener('click', () => {
+        const btn = document.getElementById('open-now-btn');
+        filterOpenNow = !filterOpenNow;
+        btn.classList.toggle('active', filterOpenNow);
+
+        if (filterOpenNow) {
+          allPoiMarkers.forEach(({ marker, poi, type }) => {
+            if (type === 'water' || type === 'toilets') return;
+            if (!isOpenNow(poi.tags?.opening_hours)) {
+              poiLayers[type].removeLayer(marker);
+            }
+          });
+        } else {
+          allPoiMarkers.forEach(({ marker, type }) => {
+            if (!poiLayers[type].hasLayer(marker)) {
+              poiLayers[type].addLayer(marker);
+            }
+          });
+        }
+      });
 
       // Geolocation
       let userLocationMarker = null;
@@ -407,6 +468,72 @@
 
     function toRad(deg) {
       return deg * Math.PI / 180;
+    }
+
+    // Check if a POI is currently open based on OSM opening_hours
+    function isOpenNow(openingHours) {
+      if (!openingHours) return false;
+      if (openingHours === '24/7') return true;
+
+      const now = new Date();
+      const dayIndex = now.getDay();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const osmDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+      const todayOsm = osmDays[dayIndex];
+
+      const rules = openingHours.split(';').map(r => r.trim());
+
+      for (const rule of rules) {
+        if (rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
+
+        const match = rule.match(/^(?:([A-Za-z,\-\s]+)\s+)?(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+        if (!match) continue;
+
+        const [, dayPart, startTime, endTime] = match;
+        let dayMatches = false;
+
+        if (!dayPart) {
+          dayMatches = true;
+        } else {
+          const daySpec = dayPart.trim();
+          if (daySpec.includes('-')) {
+            const rangeParts = daySpec.split('-');
+            if (rangeParts.length === 2) {
+              const startDay = rangeParts[0].trim();
+              const endDay = rangeParts[1].trim();
+              const startIdx = osmDays.indexOf(startDay);
+              const endIdx = osmDays.indexOf(endDay);
+              if (startIdx !== -1 && endIdx !== -1) {
+                const todayIdx = osmDays.indexOf(todayOsm);
+                if (startIdx <= endIdx) {
+                  dayMatches = todayIdx >= startIdx && todayIdx <= endIdx;
+                } else {
+                  dayMatches = todayIdx >= startIdx || todayIdx <= endIdx;
+                }
+              }
+            }
+          } else if (daySpec.includes(',')) {
+            const days = daySpec.split(',').map(d => d.trim());
+            dayMatches = days.includes(todayOsm);
+          } else {
+            dayMatches = daySpec === todayOsm;
+          }
+        }
+
+        if (dayMatches) {
+          const [startH, startM] = startTime.split(':').map(Number);
+          const [endH, endM] = endTime.split(':').map(Number);
+          const startMinutes = startH * 60 + startM;
+          const endMinutes = endH * 60 + endM;
+
+          if (endMinutes < startMinutes) {
+            if (currentMinutes >= startMinutes || currentMinutes < endMinutes) return true;
+          } else {
+            if (currentMinutes >= startMinutes && currentMinutes < endMinutes) return true;
+          }
+        }
+      }
+      return false;
     }
 
     loadSharedMap();

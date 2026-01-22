@@ -12,6 +12,8 @@ let selectedPoiTypes = [];
 let userLocationMarker = null;
 let distanceMarkers = [];
 let isOffline = !navigator.onLine;
+let filterOpenNow = false;
+let allPoiMarkers = [];
 
 // DOM Elements
 const uploadSection = document.getElementById('upload-section');
@@ -365,6 +367,7 @@ function showMap(data) {
   poiLayers.cafe = L.layerGroup();
   poiLayers.water = L.layerGroup();
   poiLayers.toilets = L.layerGroup();
+  allPoiMarkers = [];
 
   data.pois.forEach(poi => {
     // Skip unknown POI types
@@ -375,11 +378,18 @@ function showMap(data) {
     });
 
     marker.bindPopup(createPopupContent(poi));
+    marker.poiData = poi; // Store POI data for filtering
+    allPoiMarkers.push({ marker, poi, type: poi.type });
     poiLayers[poi.type].addLayer(marker);
   });
 
   // Add layers to map
   Object.values(poiLayers).forEach(layer => layer.addTo(map));
+
+  // Apply filter if active
+  if (filterOpenNow) {
+    applyOpenNowFilter();
+  }
 
   // Fit bounds
   map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
@@ -571,6 +581,39 @@ document.getElementById('share-btn').addEventListener('click', async () => {
   }
 });
 
+// Open now filter toggle
+document.getElementById('open-now-btn').addEventListener('click', () => {
+  const btn = document.getElementById('open-now-btn');
+  filterOpenNow = !filterOpenNow;
+  btn.classList.toggle('active', filterOpenNow);
+
+  if (filterOpenNow) {
+    applyOpenNowFilter();
+  } else {
+    removeOpenNowFilter();
+  }
+});
+
+function applyOpenNowFilter() {
+  allPoiMarkers.forEach(({ marker, poi, type }) => {
+    // Water and toilets are always "open"
+    if (type === 'water' || type === 'toilets') return;
+
+    const isOpen = isOpenNow(poi.tags?.opening_hours);
+    if (!isOpen) {
+      poiLayers[type].removeLayer(marker);
+    }
+  });
+}
+
+function removeOpenNowFilter() {
+  allPoiMarkers.forEach(({ marker, type }) => {
+    if (!poiLayers[type].hasLayer(marker)) {
+      poiLayers[type].addLayer(marker);
+    }
+  });
+}
+
 // Export functions
 document.getElementById('export-gpx').addEventListener('click', () => exportPOIs('gpx'));
 document.getElementById('export-csv').addEventListener('click', () => exportPOIs('csv'));
@@ -737,6 +780,99 @@ function formatOpeningHours(osmHours) {
     .trim();
 
   return formatted;
+}
+
+// Check if a POI is currently open based on OSM opening_hours
+function isOpenNow(openingHours) {
+  if (!openingHours) return false; // Unknown = assume closed for filtering
+  if (openingHours === '24/7') return true;
+
+  const now = new Date();
+  const dayIndex = now.getDay(); // 0 = Sunday
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // OSM day mapping (Mo=0 in OSM terms, but we need to convert from JS where Su=0)
+  const osmDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const todayOsm = osmDays[dayIndex];
+
+  // Parse the opening hours string
+  // Supports formats like:
+  // "Mo-Fr 07:00-19:00"
+  // "Mo-Fr 07:00-19:00; Sa 08:00-18:00"
+  // "Mo,Tu,We,Th,Fr 07:00-19:00"
+
+  const rules = openingHours.split(';').map(r => r.trim());
+
+  for (const rule of rules) {
+    if (rule.toLowerCase() === 'off' || rule.toLowerCase() === 'closed') continue;
+
+    // Match patterns like "Mo-Fr 07:00-19:00" or "Mo 07:00-19:00" or "07:00-19:00"
+    const match = rule.match(/^(?:([A-Za-z,\-\s]+)\s+)?(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+    if (!match) continue;
+
+    const [, dayPart, startTime, endTime] = match;
+
+    // Check if today matches the day specification
+    let dayMatches = false;
+
+    if (!dayPart) {
+      // No day specified = applies every day
+      dayMatches = true;
+    } else {
+      const daySpec = dayPart.trim();
+
+      // Handle day ranges like "Mo-Fr"
+      if (daySpec.includes('-')) {
+        const rangeParts = daySpec.split('-');
+        if (rangeParts.length === 2) {
+          const startDay = rangeParts[0].trim();
+          const endDay = rangeParts[1].trim();
+          const startIdx = osmDays.indexOf(startDay);
+          const endIdx = osmDays.indexOf(endDay);
+
+          if (startIdx !== -1 && endIdx !== -1) {
+            const todayIdx = osmDays.indexOf(todayOsm);
+            if (startIdx <= endIdx) {
+              dayMatches = todayIdx >= startIdx && todayIdx <= endIdx;
+            } else {
+              // Wrap around (e.g., Fr-Mo)
+              dayMatches = todayIdx >= startIdx || todayIdx <= endIdx;
+            }
+          }
+        }
+      }
+      // Handle comma-separated days like "Mo,Tu,We"
+      else if (daySpec.includes(',')) {
+        const days = daySpec.split(',').map(d => d.trim());
+        dayMatches = days.includes(todayOsm);
+      }
+      // Single day
+      else {
+        dayMatches = daySpec === todayOsm;
+      }
+    }
+
+    if (dayMatches) {
+      // Parse times
+      const [startH, startM] = startTime.split(':').map(Number);
+      const [endH, endM] = endTime.split(':').map(Number);
+      const startMinutes = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+
+      // Handle overnight hours (e.g., 22:00-02:00)
+      if (endMinutes < startMinutes) {
+        if (currentMinutes >= startMinutes || currentMinutes < endMinutes) {
+          return true;
+        }
+      } else {
+        if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 function downloadFile(content, filename, type) {

@@ -374,6 +374,10 @@ body.offline .map-section {
   border-color: #10b981;
 }
 
+.custom-marker.hotel {
+  border-color: #ec4899;
+}
+
 /* Popup styles */
 .leaflet-popup-content {
   margin: 10px 12px;
@@ -414,6 +418,10 @@ body.offline .map-section {
 
 .poi-type.toilets {
   background: #10b981;
+}
+
+.poi-type.hotel {
+  background: #ec4899;
 }
 
 .poi-nav-links {

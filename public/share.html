@@ -150,6 +150,7 @@
     .poi-type.cafe { background: #8b5cf6; }
     .poi-type.water { background: #3b82f6; }
     .poi-type.toilets { background: #10b981; }
+    .poi-type.hotel { background: #ec4899; }
 
     .poi-nav-links {
       display: flex;
@@ -225,7 +226,8 @@
       bakery: createIcon('#f59e0b', '🥖'),
       cafe: createIcon('#8b5cf6', '☕'),
       water: createIcon('#3b82f6', '💧'),
-      toilets: createIcon('#10b981', '🚻')
+      toilets: createIcon('#10b981', '🚻'),
+      hotel: createIcon('#ec4899', '🏨')
     };
 
     function createIcon(color, emoji) {
@@ -293,7 +295,8 @@
         bakery: L.layerGroup(),
         cafe: L.layerGroup(),
         water: L.layerGroup(),
-        toilets: L.layerGroup()
+        toilets: L.layerGroup(),
+        hotel: L.layerGroup()
       };
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -315,7 +318,8 @@
         bakery: 'Boulangerie',
         cafe: 'Bar / Café',
         water: "Point d'eau",
-        toilets: 'Toilettes'
+        toilets: 'Toilettes',
+        hotel: 'Hébergement'
       };
 
       data.pois.forEach(poi => {

@@ -5,7 +5,8 @@ let poiLayers = {
   bakery: null,
   cafe: null,
   water: null,
-  toilets: null
+  toilets: null,
+  hotel: null
 };
 let currentData = null;
 let selectedPoiTypes = [];
@@ -30,7 +31,8 @@ const icons = {
   bakery: createIcon('#f59e0b', '🥖'),
   cafe: createIcon('#8b5cf6', '☕'),
   water: createIcon('#3b82f6', '💧'),
-  toilets: createIcon('#10b981', '🚻')
+  toilets: createIcon('#10b981', '🚻'),
+  hotel: createIcon('#ec4899', '🏨')
 };
 
 function createIcon(color, emoji) {
@@ -241,6 +243,7 @@ gpxForm.addEventListener('submit', async (e) => {
   if (document.getElementById('poi-cafe').checked) selectedPoiTypes.push('cafe');
   if (document.getElementById('poi-water').checked) selectedPoiTypes.push('water');
   if (document.getElementById('poi-toilets').checked) selectedPoiTypes.push('toilets');
+  if (document.getElementById('poi-hotel').checked) selectedPoiTypes.push('hotel');
 
   if (selectedPoiTypes.length === 0) {
     alert('Veuillez sélectionner au moins un type de POI');
@@ -367,6 +370,7 @@ function showMap(data) {
   poiLayers.cafe = L.layerGroup();
   poiLayers.water = L.layerGroup();
   poiLayers.toilets = L.layerGroup();
+  poiLayers.hotel = L.layerGroup();
   allPoiMarkers = [];
 
   data.pois.forEach(poi => {
@@ -400,7 +404,8 @@ function createPopupContent(poi) {
     bakery: 'Boulangerie',
     cafe: 'Bar / Café',
     water: "Point d'eau",
-    toilets: 'Toilettes'
+    toilets: 'Toilettes',
+    hotel: 'Hébergement'
   };
 
   let html = `<div class="poi-popup">
@@ -529,6 +534,7 @@ backBtn.addEventListener('click', () => {
   document.getElementById('poi-cafe').checked = false;
   document.getElementById('poi-water').checked = false;
   document.getElementById('poi-toilets').checked = false;
+  document.getElementById('poi-hotel').checked = false;
 
   // Remove user location marker
   if (userLocationMarker) {

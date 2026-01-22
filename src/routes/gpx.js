@@ -12,7 +12,7 @@ const upload = multer({
 });
 
 // Valid POI types
-const VALID_POI_TYPES = ['bakery', 'cafe', 'water', 'toilets'];
+const VALID_POI_TYPES = ['bakery', 'cafe', 'water', 'toilets', 'hotel'];
 
 router.post('/upload', upload.single('gpx'), async (req, res) => {
   try {
@@ -54,7 +54,8 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
       bakery: pois.filter(p => p.type === 'bakery').length,
       cafe: pois.filter(p => p.type === 'cafe').length,
       water: pois.filter(p => p.type === 'water').length,
-      toilets: pois.filter(p => p.type === 'toilets').length
+      toilets: pois.filter(p => p.type === 'toilets').length,
+      hotel: pois.filter(p => p.type === 'hotel').length
     });
 
     res.json({
@@ -66,7 +67,8 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
         bakeries: pois.filter(p => p.type === 'bakery').length,
         cafes: pois.filter(p => p.type === 'cafe').length,
         waterPoints: pois.filter(p => p.type === 'water').length,
-        toilets: pois.filter(p => p.type === 'toilets').length
+        toilets: pois.filter(p => p.type === 'toilets').length,
+        hotels: pois.filter(p => p.type === 'hotel').length
       }
     });
   } catch (error) {

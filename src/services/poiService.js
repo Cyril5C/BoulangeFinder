@@ -12,7 +12,8 @@ const POI_QUERIES = {
   bakery: 'node["shop"="bakery"]',
   cafe: 'node["amenity"~"cafe|bar|pub"]',
   water: 'node["amenity"="drinking_water"]',
-  toilets: 'node["amenity"="toilets"]'
+  toilets: 'node["amenity"="toilets"]',
+  hotel: 'node["tourism"~"hotel|hostel|guest_house|motel"]'
 };
 
 // Paris bounding box (approximate)
@@ -167,6 +168,7 @@ function getPOIType(tags) {
   if (tags.amenity === 'cafe' || tags.amenity === 'bar' || tags.amenity === 'pub') return 'cafe';
   if (tags.amenity === 'drinking_water') return 'water';
   if (tags.amenity === 'toilets') return 'toilets';
+  if (tags.tourism === 'hotel' || tags.tourism === 'hostel' || tags.tourism === 'guest_house' || tags.tourism === 'motel') return 'hotel';
   return 'unknown';
 }
 
@@ -178,6 +180,10 @@ function getDefaultName(tags) {
   if (tags.amenity === 'pub') return 'Pub';
   if (tags.amenity === 'drinking_water') return "Point d'eau";
   if (tags.amenity === 'toilets') return 'Toilettes';
+  if (tags.tourism === 'hotel') return 'Hôtel';
+  if (tags.tourism === 'hostel') return 'Auberge';
+  if (tags.tourism === 'guest_house') return "Chambre d'hôtes";
+  if (tags.tourism === 'motel') return 'Motel';
   return 'POI';
 }
 

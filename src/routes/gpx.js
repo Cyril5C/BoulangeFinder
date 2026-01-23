@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const { parseGPX } = require('../services/gpxParser');
-const { findPOIsAlongRoute } = require('../services/poiService');
+const { findPOIsAlongRoute, getCacheStats } = require('../services/poiService');
 
 const router = express.Router();
 
@@ -74,6 +74,17 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
   } catch (error) {
     console.error('Erreur lors du traitement du GPX:', error);
     res.status(500).json({ error: 'Erreur lors du traitement du fichier GPX' });
+  }
+});
+
+// Get server-side cache stats
+router.get('/cache', (req, res) => {
+  try {
+    const stats = getCacheStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Erreur lors de la récupération du cache:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération du cache' });
   }
 });
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boulanges-finder-v12';
+const CACHE_NAME = 'boulanges-finder-v13';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

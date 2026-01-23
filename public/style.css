@@ -286,6 +286,50 @@ body {
   background: #f8d7da !important;
 }
 
+/* Server cache list */
+.server-cache-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.server-cache-title {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.server-cache-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.server-cache-item {
+  padding: 8px 10px;
+  background: #f0f4ff;
+  border-radius: 6px;
+  border-left: 3px solid #667eea;
+}
+
+.server-cache-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.server-cache-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #444;
+}
+
+.server-cache-meta {
+  font-size: 0.7rem;
+  color: #888;
+}
+
 /* Map Section */
 .map-section {
   position: fixed;

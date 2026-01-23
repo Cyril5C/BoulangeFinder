@@ -321,8 +321,66 @@ function getTimeAgo(timestamp) {
   return `il y a ${Math.floor(seconds / 86400)}j`;
 }
 
+// Fetch and display server-side cache
+async function displayServerCache() {
+  const section = document.getElementById('server-cache-section');
+  const listContainer = document.getElementById('server-cache-list');
+
+  if (!section || !listContainer) return;
+
+  try {
+    const response = await fetch('/api/gpx/cache');
+    if (!response.ok) {
+      section.classList.add('hidden');
+      return;
+    }
+
+    const stats = await response.json();
+
+    if (stats.entries.length === 0) {
+      section.classList.add('hidden');
+      return;
+    }
+
+    section.classList.remove('hidden');
+    listContainer.innerHTML = '';
+
+    // Sort by most recent first
+    stats.entries.sort((a, b) => b.timestamp - a.timestamp);
+
+    stats.entries.forEach(entry => {
+      const div = document.createElement('div');
+      div.className = 'server-cache-item';
+
+      const timeAgo = getTimeAgo(entry.timestamp);
+      const ttlMin = Math.round(entry.remainingTtlMs / 60000);
+      const bboxStr = `${entry.bbox.south.toFixed(2)},${entry.bbox.west.toFixed(2)} - ${entry.bbox.north.toFixed(2)},${entry.bbox.east.toFixed(2)}`;
+      const poiTypesStr = entry.poiTypes.join(', ');
+
+      div.innerHTML = `
+        <div class="server-cache-info">
+          <span class="server-cache-name">${entry.poiCount} POIs (${poiTypesStr})</span>
+          <span class="server-cache-meta">Zone: ${bboxStr}</span>
+          <span class="server-cache-meta">${timeAgo} - expire dans ${ttlMin}min</span>
+        </div>
+      `;
+
+      listContainer.appendChild(div);
+    });
+
+    // Update header with cache stats
+    const title = section.querySelector('.server-cache-title');
+    if (title) {
+      title.textContent = `Cache serveur (${stats.size}/${stats.maxSize})`;
+    }
+  } catch (e) {
+    section.classList.add('hidden');
+  }
+}
+
 // Display cached list on page load
 displayCachedGpxList();
+displayServerCache();
 
 // File input display
 gpxFileInput.addEventListener('change', (e) => {

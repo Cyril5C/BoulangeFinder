@@ -306,4 +306,33 @@ function toRad(deg) {
   return deg * Math.PI / 180;
 }
 
-module.exports = { findPOIsAlongRoute };
+function getCacheStats() {
+  const entries = [];
+  const now = Date.now();
+
+  for (const [key, value] of overpassCache.entries()) {
+    const [bboxStr, poiTypesStr] = key.split('|');
+    const [south, west, north, east] = bboxStr.split(',').map(Number);
+    const poiTypes = poiTypesStr.split(',');
+    const ageMs = now - value.timestamp;
+    const remainingTtlMs = Math.max(0, CACHE_TTL - ageMs);
+
+    entries.push({
+      bbox: { south, west, north, east },
+      poiTypes,
+      poiCount: value.data.length,
+      timestamp: value.timestamp,
+      ageMs,
+      remainingTtlMs
+    });
+  }
+
+  return {
+    size: overpassCache.size,
+    maxSize: MAX_CACHE_SIZE,
+    ttlMs: CACHE_TTL,
+    entries
+  };
+}
+
+module.exports = { findPOIsAlongRoute, getCacheStats };

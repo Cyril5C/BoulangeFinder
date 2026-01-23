@@ -204,6 +204,88 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* Cached GPX list */
+.cached-gpx-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.cached-gpx-title {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.cached-gpx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cached-gpx-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f8f8f8;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.cached-gpx-item:hover {
+  background: #f0f0f0;
+}
+
+.cached-gpx-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.cached-gpx-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cached-gpx-meta {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.cached-gpx-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.cached-gpx-actions button {
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.cached-gpx-actions button:hover {
+  background: #e0e0e0;
+}
+
+.cached-gpx-load:hover {
+  background: #d4edda !important;
+}
+
+.cached-gpx-delete:hover {
+  background: #f8d7da !important;
+}
+
 /* Map Section */
 .map-section {
   position: fixed;

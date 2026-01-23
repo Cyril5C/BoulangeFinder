@@ -222,6 +222,108 @@ function getCacheKey(file, maxDetour, poiTypes) {
   return `gpx_${file.name}_${file.size}_${maxDetour}_${poiTypes.sort().join('-')}`;
 }
 
+// Get all cached GPX entries from localStorage
+function getCachedGpxList() {
+  const cached = [];
+  const maxAgeMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('gpx_')) {
+      try {
+        const item = JSON.parse(localStorage.getItem(key));
+        if (item && item.timestamp && item.data) {
+          // Check if still valid
+          if (Date.now() - item.timestamp <= maxAgeMs) {
+            // Parse cache key: gpx_filename_size_maxDetour_poiTypes
+            const parts = key.replace('gpx_', '').split('_');
+            const filename = parts[0];
+            const poiCount = item.data.pois?.length || 0;
+
+            cached.push({
+              key,
+              filename,
+              timestamp: item.timestamp,
+              poiCount,
+              data: item.data
+            });
+          } else {
+            // Clean up expired entry
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (e) {
+        // Invalid cache entry
+      }
+    }
+  }
+
+  // Sort by most recent first
+  cached.sort((a, b) => b.timestamp - a.timestamp);
+  return cached;
+}
+
+// Display cached GPX list
+function displayCachedGpxList() {
+  const cachedList = getCachedGpxList();
+  const section = document.getElementById('cached-gpx-section');
+  const listContainer = document.getElementById('cached-gpx-list');
+
+  if (cachedList.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+
+  section.classList.remove('hidden');
+  listContainer.innerHTML = '';
+
+  cachedList.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'cached-gpx-item';
+
+    const timeAgo = getTimeAgo(item.timestamp);
+
+    div.innerHTML = `
+      <div class="cached-gpx-info">
+        <span class="cached-gpx-name">${escapeHtml(item.filename)}</span>
+        <span class="cached-gpx-meta">${item.poiCount} POIs - ${timeAgo}</span>
+      </div>
+      <div class="cached-gpx-actions">
+        <button class="cached-gpx-load" title="Charger">📂</button>
+        <button class="cached-gpx-delete" title="Supprimer">🗑️</button>
+      </div>
+    `;
+
+    // Load button
+    div.querySelector('.cached-gpx-load').addEventListener('click', () => {
+      currentData = item.data;
+      showMap(item.data);
+    });
+
+    // Delete button
+    div.querySelector('.cached-gpx-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      localStorage.removeItem(item.key);
+      displayCachedGpxList();
+    });
+
+    listContainer.appendChild(div);
+  });
+}
+
+// Format time ago
+function getTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+  if (seconds < 60) return "à l'instant";
+  if (seconds < 3600) return `il y a ${Math.floor(seconds / 60)} min`;
+  if (seconds < 86400) return `il y a ${Math.floor(seconds / 3600)}h`;
+  return `il y a ${Math.floor(seconds / 86400)}j`;
+}
+
+// Display cached list on page load
+displayCachedGpxList();
+
 // File input display
 gpxFileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -541,6 +643,9 @@ backBtn.addEventListener('click', () => {
     map.removeLayer(userLocationMarker);
     userLocationMarker = null;
   }
+
+  // Refresh cached GPX list
+  displayCachedGpxList();
 });
 
 // Share function

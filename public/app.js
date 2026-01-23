@@ -371,7 +371,7 @@ async function displayServerCache() {
     // Update header with cache stats
     const title = section.querySelector('.server-cache-title');
     if (title) {
-      title.textContent = `Cache serveur (${stats.size}/${stats.maxSize})`;
+      title.textContent = `Les maps de la communauté (${stats.size}/${stats.maxSize})`;
     }
   } catch (e) {
     section.classList.add('hidden');

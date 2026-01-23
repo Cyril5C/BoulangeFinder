@@ -8,6 +8,49 @@ const OVERPASS_ENDPOINTS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
 ];
 
+// In-memory cache for Overpass results
+// Key: bbox + poiTypes hash, Value: { data, timestamp }
+const overpassCache = new Map();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const MAX_CACHE_SIZE = 100; // Maximum number of cached queries
+
+function getCacheKey(bbox, poiTypes) {
+  // Round bbox to 2 decimal places to increase cache hits for similar areas
+  const roundedBbox = {
+    south: Math.floor(bbox.south * 100) / 100,
+    north: Math.ceil(bbox.north * 100) / 100,
+    west: Math.floor(bbox.west * 100) / 100,
+    east: Math.ceil(bbox.east * 100) / 100
+  };
+  return `${roundedBbox.south},${roundedBbox.west},${roundedBbox.north},${roundedBbox.east}|${poiTypes.sort().join(',')}`;
+}
+
+function getFromCache(key) {
+  const entry = overpassCache.get(key);
+  if (!entry) return null;
+
+  // Check if cache entry is still valid
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    overpassCache.delete(key);
+    return null;
+  }
+
+  return entry.data;
+}
+
+function setCache(key, data) {
+  // Evict oldest entries if cache is full
+  if (overpassCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = overpassCache.keys().next().value;
+    overpassCache.delete(oldestKey);
+  }
+
+  overpassCache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+}
+
 const POI_QUERIES = {
   bakery: 'node["shop"="bakery"]',
   cafe: 'node["amenity"~"cafe|bar|pub"]',
@@ -36,6 +79,19 @@ async function findPOIsAlongRoute(trackPoints, maxDetourMeters = 500, poiTypes =
   // Get bounding box with buffer
   const bbox = getBoundingBox(simplifiedTrack, maxDetourMeters);
 
+  // Check cache first
+  const cacheKey = getCacheKey(bbox, poiTypes);
+  const cachedData = getFromCache(cacheKey);
+
+  if (cachedData) {
+    console.log('Cache hit for Overpass query');
+    // Filter POIs by actual distance to track (cache stores raw elements)
+    const pois = filterPOIsByDistance(cachedData, trackPoints, maxDetourMeters);
+    return pois;
+  }
+
+  console.log('Cache miss - fetching from Overpass');
+
   // Build Overpass query with selected POI types
   const query = buildOverpassQuery(bbox, poiTypes);
 
@@ -45,6 +101,9 @@ async function findPOIsAlongRoute(trackPoints, maxDetourMeters = 500, poiTypes =
     try {
       console.log(`Trying Overpass endpoint: ${endpoint}`);
       const data = await fetchWithRetry(endpoint, query);
+
+      // Store raw elements in cache (before distance filtering)
+      setCache(cacheKey, data.elements || []);
 
       // Filter POIs by actual distance to track
       const pois = filterPOIsByDistance(data.elements || [], trackPoints, maxDetourMeters);

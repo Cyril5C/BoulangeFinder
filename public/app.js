@@ -35,6 +35,15 @@ const icons = {
   hotel: createIcon('#ec4899', '🏨')
 };
 
+function createBorneIcon(name) {
+  return L.divIcon({
+    className: 'distance-marker',
+    html: `<div class="distance-marker-inner">${name}</div>`,
+    iconSize: [40, 32],
+    iconAnchor: [20, 16]
+  });
+}
+
 function createIcon(color, emoji) {
   return L.divIcon({
     className: 'custom-div-icon',
@@ -523,23 +532,21 @@ function showMap(data) {
   }).addTo(map);
 
   // Add distance markers every 20km
-  addDistanceMarkers(data.track);
-
   // Create POI layers
   poiLayers.bakery = L.layerGroup();
   poiLayers.cafe = L.layerGroup();
   poiLayers.water = L.layerGroup();
   poiLayers.toilets = L.layerGroup();
   poiLayers.hotel = L.layerGroup();
+  poiLayers.borne = L.layerGroup();
   allPoiMarkers = [];
 
   data.pois.forEach(poi => {
     // Skip unknown POI types
     if (!poiLayers[poi.type]) return;
 
-    const marker = L.marker([poi.lat, poi.lon], {
-      icon: icons[poi.type]
-    });
+    const icon = poi.type === 'borne' ? createBorneIcon(poi.name) : icons[poi.type];
+    const marker = L.marker([poi.lat, poi.lon], { icon });
 
     marker.bindPopup(createPopupContent(poi));
     marker.poiData = poi; // Store POI data for filtering
@@ -565,7 +572,8 @@ function createPopupContent(poi) {
     cafe: 'Bar / Café',
     water: "Point d'eau",
     toilets: 'Toilettes',
-    hotel: 'Hébergement'
+    hotel: 'Hébergement',
+    borne: 'Borne kilométrique'
   };
 
   let html = `<div class="poi-popup">
@@ -920,10 +928,19 @@ function generateGPX(pois) {
 }
 
 function generateCSV(pois) {
-  const headers = ['nom', 'type', 'latitude', 'longitude', 'distance_m'];
-  const rows = pois.map(poi =>
-    [poi.name, poi.type, poi.lat, poi.lon, poi.distance].join(',')
-  );
+  const headers = ['nom', 'type', 'latitude', 'longitude', 'distance_m', 'horaires', 'adresse', 'google_maps'];
+  const escape = v => {
+    const s = v == null ? '' : String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rows = pois.filter(poi => poi.type && poi.type !== 'unknown').map(poi => {
+    const tags = poi.tags || {};
+    const adresse = [tags['addr:housenumber'], tags['addr:street'], tags['addr:postcode'], tags['addr:city']]
+      .filter(Boolean).join(' ');
+    const googleMaps = `https://www.google.com/maps?q=${poi.lat},${poi.lon}`;
+    return [poi.name, poi.type, poi.lat, poi.lon, poi.distance, tags.opening_hours, adresse, googleMaps]
+      .map(escape).join(',');
+  });
   return [headers.join(','), ...rows].join('\n');
 }
 

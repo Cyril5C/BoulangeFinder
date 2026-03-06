@@ -189,6 +189,7 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
 
     if (minDistance <= maxDistance) {
       const poiType = getPOIType(element.tags);
+      if (poiType === 'unknown') continue;
       const openingHoursStr = element.tags?.opening_hours;
 
       // Check if open now using the opening_hours library
@@ -218,7 +219,52 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
     }
   }
 
+  // Add distance bornes (every 10km of remaining distance)
+  const bornes = generateBornes(trackPoints);
+  pois.push(...bornes);
+
   return pois;
+}
+
+function generateBornes(trackPoints, intervalMeters = 10000) {
+  // Compute cumulative distances along the track (in meters, from start)
+  const cumDist = [0];
+  for (let i = 1; i < trackPoints.length; i++) {
+    const d = haversineDistance(trackPoints[i - 1].lat, trackPoints[i - 1].lon, trackPoints[i].lat, trackPoints[i].lon);
+    cumDist.push(cumDist[i - 1] + d);
+  }
+  const totalMeters = cumDist[cumDist.length - 1];
+
+  const bornes = [];
+  // Iterate every 10km from START; remaining = total - distanceDone
+  for (let distDone = intervalMeters; distDone < totalMeters; distDone += intervalMeters) {
+    const remainingMeters = totalMeters - distDone;
+    const remainingKm = Math.round(remainingMeters / 1000);
+
+    // Find the segment where distDone falls
+    let idx = cumDist.findIndex(d => d >= distDone);
+    if (idx <= 0) idx = 1;
+
+    const segStart = cumDist[idx - 1];
+    const segEnd = cumDist[idx];
+    const t = segEnd === segStart ? 0 : (distDone - segStart) / (segEnd - segStart);
+
+    const lat = trackPoints[idx - 1].lat + t * (trackPoints[idx].lat - trackPoints[idx - 1].lat);
+    const lon = trackPoints[idx - 1].lon + t * (trackPoints[idx].lon - trackPoints[idx - 1].lon);
+
+    bornes.push({
+      id: `borne-${remainingKm}km`,
+      lat,
+      lon,
+      type: 'borne',
+      name: `${remainingKm} km`,
+      distance: 0,
+      tags: {},
+      isOpenNow: null
+    });
+  }
+
+  return bornes;
 }
 
 function getPOIType(tags) {

@@ -831,7 +831,7 @@ function exportPOIs(format) {
       type = 'application/gpx+xml';
       break;
     case 'csv':
-      content = generateCSV(filteredPois);
+      content = generateCSV(filteredPois, currentData.track);
       filename = 'pois.csv';
       type = 'text/csv';
       break;
@@ -927,8 +927,40 @@ function generateGPX(pois) {
   return gpx;
 }
 
-function generateCSV(pois) {
-  const headers = ['nom', 'type', 'latitude', 'longitude', 'distance_m', 'horaires', 'adresse', 'google_maps'];
+function getTrackPosition(poi, track) {
+  if (!track || track.length < 2) return { distDone: null, distRemaining: null };
+
+  const cumDist = [0];
+  for (let i = 1; i < track.length; i++) {
+    cumDist.push(cumDist[i - 1] + haversineDistance(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon));
+  }
+  const totalDist = cumDist[cumDist.length - 1];
+
+  let bestDist = Infinity;
+  let bestDistDone = 0;
+  for (let i = 1; i < track.length; i++) {
+    const segLen = cumDist[i] - cumDist[i - 1];
+    if (segLen === 0) continue;
+    const dx = track[i].lat - track[i - 1].lat;
+    const dy = track[i].lon - track[i - 1].lon;
+    const t = Math.max(0, Math.min(1, ((poi.lat - track[i - 1].lat) * dx + (poi.lon - track[i - 1].lon) * dy) / (dx * dx + dy * dy)));
+    const projLat = track[i - 1].lat + t * dx;
+    const projLon = track[i - 1].lon + t * dy;
+    const dist = haversineDistance(poi.lat, poi.lon, projLat, projLon);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestDistDone = cumDist[i - 1] + t * segLen;
+    }
+  }
+
+  return {
+    distDone: Math.round(bestDistDone / 100) / 10,       // km, 1 décimale
+    distRemaining: Math.round((totalDist - bestDistDone) / 100) / 10
+  };
+}
+
+function generateCSV(pois, track) {
+  const headers = ['nom', 'type', 'latitude', 'longitude', 'distance_m', 'km_parcourus', 'km_restants', 'horaires', 'adresse', 'google_maps'];
   const escape = v => {
     const s = v == null ? '' : String(v);
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
@@ -938,7 +970,8 @@ function generateCSV(pois) {
     const adresse = [tags['addr:housenumber'], tags['addr:street'], tags['addr:postcode'], tags['addr:city']]
       .filter(Boolean).join(' ');
     const googleMaps = `https://www.google.com/maps?q=${poi.lat},${poi.lon}`;
-    return [poi.name, poi.type, poi.lat, poi.lon, poi.distance, tags.opening_hours, adresse, googleMaps]
+    const { distDone, distRemaining } = getTrackPosition(poi, track);
+    return [poi.name, poi.type, poi.lat, poi.lon, poi.distance, distDone, distRemaining, tags.opening_hours, adresse, googleMaps]
       .map(escape).join(',');
   });
   return [headers.join(','), ...rows].join('\n');

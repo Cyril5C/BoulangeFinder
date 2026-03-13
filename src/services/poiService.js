@@ -53,7 +53,7 @@ function setCache(key, data) {
 
 const POI_QUERIES = {
   bakery: 'node["shop"="bakery"]',
-  cafe: 'node["amenity"~"cafe|bar|pub"]',
+  cafe: (bboxStr) => `(node["amenity"~"cafe|bar|pub"](${bboxStr});node["bar"="yes"](${bboxStr});)`,
   water: 'node["amenity"="drinking_water"]',
   toilets: 'node["amenity"="toilets"]',
   hotel: 'node["tourism"~"hotel|hostel|guest_house|motel"]'
@@ -164,7 +164,10 @@ function buildOverpassQuery(bbox, poiTypes) {
 
   const queries = poiTypes
     .filter(type => POI_QUERIES[type])
-    .map(type => `${POI_QUERIES[type]}(${bboxStr});`)
+    .map(type => {
+      const q = POI_QUERIES[type];
+      return typeof q === 'function' ? `${q(bboxStr)};` : `${q}(${bboxStr});`;
+    })
     .join('\n      ');
 
   return `

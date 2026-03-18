@@ -591,6 +591,21 @@ function createPopupContent(poi) {
     html += `<p>Horaires: ${escapeHtml(hours).replace(/&lt;br&gt;/g, '<br>')}</p>`;
   }
 
+  const phone = poi.tags?.phone || poi.tags?.['contact:phone'];
+  if (phone) {
+    html += `<p>📞 <a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></p>`;
+  }
+
+  const mobile = poi.tags?.mobile || poi.tags?.['contact:mobile'];
+  if (mobile) {
+    html += `<p>📱 <a href="tel:${escapeHtml(mobile)}">${escapeHtml(mobile)}</a></p>`;
+  }
+
+  const website = poi.tags?.website || poi.tags?.['contact:website'];
+  if (website) {
+    html += `<p>🌐 <a href="${escapeHtml(website)}" target="_blank" rel="noopener">Site web</a></p>`;
+  }
+
   html += `<div class="poi-nav-links">
     <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'google', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Google Maps</a>
     <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'apple', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Apple Plans</a>
@@ -966,7 +981,7 @@ function getTrackPosition(poi, track) {
 }
 
 function generateCSV(pois, track) {
-  const headers = ['nom', 'type', 'latitude', 'longitude', 'distance_m', 'km_parcourus', 'km_restants', 'horaires', 'adresse', 'google_maps'];
+  const headers = ['nom', 'type', 'latitude', 'longitude', 'distance_m', 'km_parcourus', 'km_restants', 'horaires', 'telephone', 'mobile', 'site_web', 'adresse', 'google_maps'];
   const escape = v => {
     const s = v == null ? '' : String(v);
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
@@ -976,8 +991,11 @@ function generateCSV(pois, track) {
     const adresse = [tags['addr:housenumber'], tags['addr:street'], tags['addr:postcode'], tags['addr:city']]
       .filter(Boolean).join(' ');
     const googleMaps = `https://www.google.com/maps?q=${poi.lat},${poi.lon}`;
+    const phone = tags.phone || tags['contact:phone'] || '';
+    const mobile = tags.mobile || tags['contact:mobile'] || '';
+    const website = tags.website || tags['contact:website'] || '';
     const { distDone, distRemaining } = getTrackPosition(poi, track);
-    return [poi.name, poi.type, poi.lat, poi.lon, poi.distance, distDone, distRemaining, tags.opening_hours, adresse, googleMaps]
+    return [poi.name, poi.type, poi.lat, poi.lon, poi.distance, distDone, distRemaining, tags.opening_hours, phone, mobile, website, adresse, googleMaps]
       .map(escape).join(',');
   });
   return [headers.join(','), ...rows].join('\n');

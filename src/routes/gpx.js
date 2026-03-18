@@ -12,7 +12,7 @@ const upload = multer({
 });
 
 // Valid POI types
-const VALID_POI_TYPES = ['bakery', 'cafe', 'water', 'toilets', 'hotel'];
+const VALID_POI_TYPES = ['bakery', 'cafe', 'water', 'toilets', 'hotel', 'camping'];
 
 router.post('/upload', upload.single('gpx'), async (req, res) => {
   try {

@@ -6,7 +6,8 @@ let poiLayers = {
   cafe: null,
   water: null,
   toilets: null,
-  hotel: null
+  hotel: null,
+  camping: null
 };
 let currentData = null;
 let selectedPoiTypes = [];
@@ -32,7 +33,8 @@ const icons = {
   cafe: createIcon('#8b5cf6', '☕'),
   water: createIcon('#3b82f6', '💧'),
   toilets: createIcon('#10b981', '🚻'),
-  hotel: createIcon('#ec4899', '🏨')
+  hotel: createIcon('#ec4899', '🏨'),
+  camping: createIcon('#16a34a', '⛺')
 };
 
 function createBorneIcon(name) {
@@ -413,6 +415,7 @@ gpxForm.addEventListener('submit', async (e) => {
   if (document.getElementById('poi-water').checked) selectedPoiTypes.push('water');
   if (document.getElementById('poi-toilets').checked) selectedPoiTypes.push('toilets');
   if (document.getElementById('poi-hotel').checked) selectedPoiTypes.push('hotel');
+  if (document.getElementById('poi-camping').checked) selectedPoiTypes.push('camping');
 
   if (selectedPoiTypes.length === 0) {
     alert('Veuillez sélectionner au moins un type de POI');
@@ -538,6 +541,7 @@ function showMap(data) {
   poiLayers.water = L.layerGroup();
   poiLayers.toilets = L.layerGroup();
   poiLayers.hotel = L.layerGroup();
+  poiLayers.camping = L.layerGroup();
   poiLayers.borne = L.layerGroup();
   allPoiMarkers = [];
 
@@ -573,6 +577,7 @@ function createPopupContent(poi) {
     water: "Point d'eau",
     toilets: 'Toilettes',
     hotel: 'Hébergement',
+    camping: 'Camping',
     borne: 'Borne kilométrique'
   };
 
@@ -703,6 +708,7 @@ backBtn.addEventListener('click', () => {
   document.getElementById('poi-water').checked = false;
   document.getElementById('poi-toilets').checked = false;
   document.getElementById('poi-hotel').checked = false;
+  document.getElementById('poi-camping').checked = false;
 
   // Remove user location marker
   if (userLocationMarker) {

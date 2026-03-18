@@ -51,12 +51,16 @@ function setCache(key, data) {
   });
 }
 
+const WIDE_RADIUS_TYPES = new Set(['hotel', 'camping']);
+const WIDE_RADIUS_METERS = 5000;
+
 const POI_QUERIES = {
   bakery: 'node["shop"="bakery"]',
   cafe: (bboxStr) => `(node["amenity"~"cafe|bar|pub"](${bboxStr});node["bar"="yes"](${bboxStr});)`,
   water: 'node["amenity"="drinking_water"]',
   toilets: 'node["amenity"="toilets"]',
-  hotel: 'node["tourism"~"hotel|hostel|guest_house|motel"]'
+  hotel: 'node["tourism"~"hotel|hostel|guest_house|motel"]',
+  camping: 'node["tourism"="camp_site"]'
 };
 
 // Paris bounding box (approximate)
@@ -76,8 +80,10 @@ async function findPOIsAlongRoute(trackPoints, maxDetourMeters = 500, poiTypes =
   // Simplify track to reduce query complexity
   const simplifiedTrack = simplifyTrack(trackPoints, 500);
 
-  // Get bounding box with buffer
-  const bbox = getBoundingBox(simplifiedTrack, maxDetourMeters);
+  // Get bounding box with buffer — wide-radius types (hotel, camping) always use 5km
+  const hasWideRadiusType = poiTypes.some(t => WIDE_RADIUS_TYPES.has(t));
+  const bboxRadius = hasWideRadiusType ? Math.max(maxDetourMeters, WIDE_RADIUS_METERS) : maxDetourMeters;
+  const bbox = getBoundingBox(simplifiedTrack, bboxRadius);
 
   // Check cache first
   const cacheKey = getCacheKey(bbox, poiTypes);
@@ -188,11 +194,13 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
     // Exclude POIs in Paris (too many points)
     if (isInParis(element.lat, element.lon)) continue;
 
+    const poiType = getPOIType(element.tags);
+    if (poiType === 'unknown') continue;
+
     const minDistance = getMinDistanceToTrack(element.lat, element.lon, trackPoints);
 
-    if (minDistance <= maxDistance) {
-      const poiType = getPOIType(element.tags);
-      if (poiType === 'unknown') continue;
+    const effectiveMax = WIDE_RADIUS_TYPES.has(poiType) ? WIDE_RADIUS_METERS : maxDistance;
+    if (minDistance <= effectiveMax) {
       const openingHoursStr = element.tags?.opening_hours;
 
       // Check if open now using the opening_hours library
@@ -273,10 +281,11 @@ function generateBornes(trackPoints, intervalMeters = 10000) {
 function getPOIType(tags) {
   if (!tags) return 'unknown';
   if (tags.shop === 'bakery') return 'bakery';
-  if (tags.amenity === 'cafe' || tags.amenity === 'bar' || tags.amenity === 'pub') return 'cafe';
+  if (tags.amenity === 'cafe' || tags.amenity === 'bar' || tags.amenity === 'pub' || tags.bar === 'yes') return 'cafe';
   if (tags.amenity === 'drinking_water') return 'water';
   if (tags.amenity === 'toilets') return 'toilets';
   if (tags.tourism === 'hotel' || tags.tourism === 'hostel' || tags.tourism === 'guest_house' || tags.tourism === 'motel') return 'hotel';
+  if (tags.tourism === 'camp_site') return 'camping';
   return 'unknown';
 }
 
@@ -286,12 +295,14 @@ function getDefaultName(tags) {
   if (tags.amenity === 'cafe') return 'Café';
   if (tags.amenity === 'bar') return 'Bar';
   if (tags.amenity === 'pub') return 'Pub';
+  if (tags.bar === 'yes') return 'Bar';
   if (tags.amenity === 'drinking_water') return "Point d'eau";
   if (tags.amenity === 'toilets') return 'Toilettes';
   if (tags.tourism === 'hotel') return 'Hôtel';
   if (tags.tourism === 'hostel') return 'Auberge';
   if (tags.tourism === 'guest_house') return "Chambre d'hôtes";
   if (tags.tourism === 'motel') return 'Motel';
+  if (tags.tourism === 'camp_site') return 'Camping';
   return 'POI';
 }
 

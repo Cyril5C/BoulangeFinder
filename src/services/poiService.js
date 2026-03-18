@@ -52,7 +52,7 @@ function setCache(key, data) {
 }
 
 const WIDE_RADIUS_TYPES = new Set(['hotel', 'camping']);
-const WIDE_RADIUS_METERS = 5000;
+const WIDE_RADIUS_METERS = 10000;
 
 const POI_QUERIES = {
   bakery: 'node["shop"="bakery"]',
@@ -60,7 +60,7 @@ const POI_QUERIES = {
   water: 'node["amenity"="drinking_water"]',
   toilets: 'node["amenity"="toilets"]',
   hotel: 'node["tourism"~"hotel|hostel|guest_house|motel"]',
-  camping: 'node["tourism"="camp_site"]'
+  camping: (bboxStr) => `(node["tourism"="camp_site"](${bboxStr});way["tourism"="camp_site"](${bboxStr});relation["tourism"="camp_site"](${bboxStr});)`
 };
 
 // Paris bounding box (approximate)
@@ -181,7 +181,7 @@ function buildOverpassQuery(bbox, poiTypes) {
     (
       ${queries}
     );
-    out body;
+    out body center;
   `;
 }
 
@@ -189,15 +189,18 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
   const pois = [];
 
   for (const element of elements) {
-    if (element.type !== 'node') continue;
+    // For ways/relations, use the centroid provided by "out center"
+    const lat = element.lat ?? element.center?.lat;
+    const lon = element.lon ?? element.center?.lon;
+    if (lat == null || lon == null) continue;
 
     // Exclude POIs in Paris (too many points)
-    if (isInParis(element.lat, element.lon)) continue;
+    if (isInParis(lat, lon)) continue;
 
     const poiType = getPOIType(element.tags);
     if (poiType === 'unknown') continue;
 
-    const minDistance = getMinDistanceToTrack(element.lat, element.lon, trackPoints);
+    const minDistance = getMinDistanceToTrack(lat, lon, trackPoints);
 
     const effectiveMax = WIDE_RADIUS_TYPES.has(poiType) ? WIDE_RADIUS_METERS : maxDistance;
     if (minDistance <= effectiveMax) {
@@ -209,7 +212,7 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
         isOpenNow = true; // Always considered "open"
       } else if (openingHoursStr) {
         try {
-          const oh = new OpeningHours(openingHoursStr, { lat: element.lat, lon: element.lon, address: { country_code: 'fr' } });
+          const oh = new OpeningHours(openingHoursStr, { lat, lon, address: { country_code: 'fr' } });
           isOpenNow = oh.getState();
         } catch (e) {
           // Invalid opening_hours format - leave as unknown
@@ -219,8 +222,8 @@ function filterPOIsByDistance(elements, trackPoints, maxDistance) {
 
       pois.push({
         id: element.id,
-        lat: element.lat,
-        lon: element.lon,
+        lat,
+        lon,
         type: poiType,
         name: element.tags?.name || getDefaultName(element.tags),
         distance: Math.round(minDistance),

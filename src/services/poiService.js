@@ -60,7 +60,9 @@ const POI_QUERIES = {
   water: 'node["amenity"="drinking_water"]',
   toilets: 'node["amenity"="toilets"]',
   hotel: 'node["tourism"~"hotel|hostel|guest_house|motel"]',
-  camping: (bboxStr) => `(node["tourism"="camp_site"](${bboxStr});way["tourism"="camp_site"](${bboxStr});relation["tourism"="camp_site"](${bboxStr});)`
+  camping: (bboxStr) => `(node["tourism"="camp_site"](${bboxStr});way["tourism"="camp_site"](${bboxStr});relation["tourism"="camp_site"](${bboxStr});)`,
+  restaurant: 'node["amenity"="restaurant"]',
+  supermarket: 'node["shop"~"supermarket|convenience|grocery|greengrocer|general"]'
 };
 
 // Paris bounding box (approximate)
@@ -289,6 +291,8 @@ function getPOIType(tags) {
   if (tags.amenity === 'toilets') return 'toilets';
   if (tags.tourism === 'hotel' || tags.tourism === 'hostel' || tags.tourism === 'guest_house' || tags.tourism === 'motel') return 'hotel';
   if (tags.tourism === 'camp_site') return 'camping';
+  if (tags.amenity === 'restaurant') return 'restaurant';
+  if (['supermarket', 'convenience', 'grocery', 'greengrocer', 'general'].includes(tags.shop)) return 'supermarket';
   return 'unknown';
 }
 
@@ -306,6 +310,12 @@ function getDefaultName(tags) {
   if (tags.tourism === 'guest_house') return "Chambre d'hôtes";
   if (tags.tourism === 'motel') return 'Motel';
   if (tags.tourism === 'camp_site') return 'Camping';
+  if (tags.amenity === 'restaurant') return 'Restaurant';
+  if (tags.shop === 'supermarket') return 'Supermarché';
+  if (tags.shop === 'convenience') return 'Épicerie';
+  if (tags.shop === 'grocery') return 'Épicerie';
+  if (tags.shop === 'greengrocer') return 'Épicerie';
+  if (tags.shop === 'general') return 'Épicerie';
   return 'POI';
 }
 

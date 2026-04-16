@@ -7,7 +7,9 @@ let poiLayers = {
   water: null,
   toilets: null,
   hotel: null,
-  camping: null
+  camping: null,
+  restaurant: null,
+  supermarket: null
 };
 let currentData = null;
 let selectedPoiTypes = [];
@@ -34,7 +36,9 @@ const icons = {
   water: createIcon('#3b82f6', '💧'),
   toilets: createIcon('#10b981', '🚻'),
   hotel: createIcon('#ec4899', '🏨'),
-  camping: createIcon('#16a34a', '⛺')
+  camping: createIcon('#16a34a', '⛺'),
+  restaurant: createIcon('#ef4444', '🍽️'),
+  supermarket: createIcon('#0ea5e9', '🛒')
 };
 
 function createBorneIcon(name) {
@@ -416,6 +420,8 @@ gpxForm.addEventListener('submit', async (e) => {
   if (document.getElementById('poi-toilets').checked) selectedPoiTypes.push('toilets');
   if (document.getElementById('poi-hotel').checked) selectedPoiTypes.push('hotel');
   if (document.getElementById('poi-camping').checked) selectedPoiTypes.push('camping');
+  if (document.getElementById('poi-restaurant').checked) selectedPoiTypes.push('restaurant');
+  if (document.getElementById('poi-supermarket').checked) selectedPoiTypes.push('supermarket');
 
   if (selectedPoiTypes.length === 0) {
     alert('Veuillez sélectionner au moins un type de POI');
@@ -542,6 +548,8 @@ function showMap(data) {
   poiLayers.toilets = L.layerGroup();
   poiLayers.hotel = L.layerGroup();
   poiLayers.camping = L.layerGroup();
+  poiLayers.restaurant = L.layerGroup();
+  poiLayers.supermarket = L.layerGroup();
   poiLayers.borne = L.layerGroup();
   allPoiMarkers = [];
 
@@ -578,6 +586,8 @@ function createPopupContent(poi) {
     toilets: 'Toilettes',
     hotel: 'Hébergement',
     camping: 'Camping',
+    restaurant: 'Restaurant',
+    supermarket: 'Supermarché / Épicerie',
     borne: 'Borne kilométrique'
   };
 
@@ -724,6 +734,8 @@ backBtn.addEventListener('click', () => {
   document.getElementById('poi-toilets').checked = false;
   document.getElementById('poi-hotel').checked = false;
   document.getElementById('poi-camping').checked = false;
+  document.getElementById('poi-restaurant').checked = false;
+  document.getElementById('poi-supermarket').checked = false;
 
   // Remove user location marker
   if (userLocationMarker) {
@@ -981,7 +993,7 @@ function getTrackPosition(poi, track) {
 }
 
 function generateCSV(pois, track) {
-  const headers = ['nom', 'type', 'latitude', 'longitude', 'distance_m', 'km_parcourus', 'km_restants', 'horaires', 'telephone', 'mobile', 'site_web', 'adresse', 'google_maps'];
+  const headers = ['favori', 'nom', 'type', 'latitude', 'longitude', 'distance_m', 'km_parcourus', 'km_restants', 'horaires', 'telephone', 'mobile', 'site_web', 'adresse', 'google_maps'];
   const escape = v => {
     const s = v == null ? '' : String(v);
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
@@ -995,7 +1007,7 @@ function generateCSV(pois, track) {
     const mobile = tags.mobile || tags['contact:mobile'] || '';
     const website = tags.website || tags['contact:website'] || '';
     const { distDone, distRemaining } = getTrackPosition(poi, track);
-    return [poi.name, poi.type, poi.lat, poi.lon, poi.distance, distDone, distRemaining, tags.opening_hours, phone, mobile, website, adresse, googleMaps]
+    return ['', poi.name, poi.type, poi.lat, poi.lon, poi.distance, distDone, distRemaining, tags.opening_hours, phone, mobile, website, adresse, googleMaps]
       .map(escape).join(',');
   });
   return [headers.join(','), ...rows].join('\n');

@@ -5,6 +5,8 @@ const OpeningHours = require('opening_hours');
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter',
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
 ];
 
@@ -133,7 +135,10 @@ async function fetchWithRetry(endpoint, query, retries = 2) {
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'BoulangesFinder/1.0 (https://github.com/cyrilcincet/boulanges-finder)'
+        },
         body: `data=${encodeURIComponent(query)}`,
         signal: controller.signal
       });

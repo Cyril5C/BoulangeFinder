@@ -363,6 +363,14 @@ body {
   height: 100%;
 }
 
+@media (max-width: 640px) {
+  #map {
+    /* Push map below the full-width controls bar (~57px + safe area) */
+    height: calc(100% - 57px - env(safe-area-inset-top, 0px));
+    margin-top: calc(57px + env(safe-area-inset-top, 0px));
+  }
+}
+
 /* Compact controls bar */
 .controls-panel {
   position: absolute;
@@ -393,8 +401,9 @@ body {
   transform: scale(0.95);
 }
 
-.control-btn.toggle-btn.active {
-  background: #10b981;
+.control-btn.toggle-btn.active,
+.control-btn.active {
+  background: #667eea;
   color: white;
 }
 
@@ -812,7 +821,128 @@ body.offline .map-section {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Tablet and Desktop */
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+
+  /* Upload page */
+  .upload-section {
+    align-items: flex-start;
+    padding: 12px 12px env(safe-area-inset-bottom, 12px);
+  }
+
+  .upload-container {
+    padding: 20px 16px;
+    border-radius: 14px;
+  }
+
+  .upload-container h1 {
+    font-size: 1.4rem;
+  }
+
+  .poi-checkboxes {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .poi-checkbox {
+    padding: 9px 10px;
+    font-size: 0.85rem;
+  }
+
+  /* Controls panel — scrollable full-width bar at top */
+  .controls-panel {
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 8px env(safe-area-inset-right, 8px) 8px env(safe-area-inset-left, 8px);
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    border-radius: 0;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  }
+
+  .controls-panel::-webkit-scrollbar { display: none; }
+
+  .control-btn {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    min-height: 40px;
+  }
+
+  .day-select {
+    padding-right: 20px;
+  }
+
+  /* POI type filter — scrollable, above bottom safe area */
+  .poi-type-filter {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
+    left: 0;
+    right: 56px;
+    max-width: none;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 4px 10px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .poi-type-filter::-webkit-scrollbar { display: none; }
+
+  .poi-filter-btn {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    padding: 6px 9px;
+  }
+
+  /* Geoloc button — above safe area */
+  .geoloc-btn {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    right: 10px;
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Hide map footer on mobile — not enough space */
+  .map-footer {
+    display: none;
+  }
+
+  /* Leaflet popup — constrain width */
+  .leaflet-popup-content-wrapper {
+    max-width: min(85vw, 300px) !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 10px !important;
+    width: auto !important;
+  }
+
+  .poi-popup p {
+    font-size: 0.8rem;
+  }
+
+  .poi-nav-links {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Modal — full width on small screens */
+  .modal-content {
+    max-width: 100%;
+    margin: 0 4px;
+  }
+}
+
+/* ── Tablet & Desktop ───────────────────────────────────────────────────── */
 @media (min-width: 768px) {
   .upload-container {
     padding: 40px;
@@ -839,5 +969,4 @@ body.offline .map-section {
     flex-direction: row;
     gap: 10px;
   }
-
 }

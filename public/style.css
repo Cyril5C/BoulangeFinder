@@ -830,6 +830,27 @@ body.offline .map-section {
   color: #9ca3af;
 }
 
+/* Offline toast */
+.offline-toast {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 2000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  opacity: 1;
+  transition: opacity 0.4s;
+}
+
+.offline-toast.fade-out { opacity: 0; }
+
 /* Add POI mode — map cursor */
 .map-add-mode {
   cursor: crosshair !important;

@@ -193,6 +193,16 @@ async function cacheTrackTiles(track) {
   }
   btn.textContent = '✅';
   btn.title = `${urls.length} tuiles mises en cache`;
+  showOfflineToast();
+}
+
+function showOfflineToast() {
+  const toast = document.getElementById('offline-toast');
+  toast.classList.remove('hidden', 'fade-out');
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => toast.classList.add('hidden'), 400);
+  }, 3000);
 }
 
 const POI_META = {

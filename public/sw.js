@@ -1,4 +1,8 @@
-const CACHE_NAME = 'boulanges-finder-v18';
+const CACHE_NAME = 'boulanges-finder-v19';
+// Tile cache is intentionally versioned separately so app updates
+// never wipe the tiles the user pre-cached for offline use.
+const TILE_CACHE_NAME = 'boulanges-tiles-v1';
+
 const STATIC_ASSETS = [
   '/app.js',
   '/style.css',
@@ -17,9 +21,7 @@ const EXTERNAL_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Cache local assets
       await cache.addAll(STATIC_ASSETS);
-      // Cache external assets (may fail if offline during install)
       try {
         await cache.addAll(EXTERNAL_ASSETS);
       } catch (e) {
@@ -30,12 +32,14 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate - clean old caches
+// Activate - delete old app caches but preserve tile cache
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys
+          .filter((key) => key !== CACHE_NAME && key !== TILE_CACHE_NAME)
+          .map((key) => caches.delete(key))
       );
     })
   );
@@ -46,19 +50,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Handle tile requests (OpenStreetMap) - cache first, then network
+  // OSM tiles — cache-first in the persistent tile cache
   if (url.hostname.includes('tile.openstreetmap.org')) {
     event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
+      caches.open(TILE_CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(event.request);
         if (cached) return cached;
 
         try {
-          // Force cors mode so the response is never opaque (status 0)
-          // and can actually be stored in the cache
+          // cors mode so the response is never opaque and can be stored
           const response = await fetch(new Request(event.request.url, {
             mode: 'cors',
             credentials: 'omit'
@@ -75,12 +77,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle API requests - network only, but cache successful responses
+  // API requests - network only, fallback to cached GPX result
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Cache successful GPX responses for offline use
           if (response.ok && url.pathname === '/api/gpx/upload') {
             const cloned = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -90,7 +91,6 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // If offline and requesting GPX, return cached result
           if (url.pathname === '/api/gpx/upload') {
             return caches.match('/api/gpx/last-result');
           }
@@ -116,7 +116,6 @@ self.addEventListener('fetch', (event) => {
       .catch(() => {
         return caches.match(event.request).then((cached) => {
           if (cached) return cached;
-          // Fallback to index.html for navigation requests
           if (event.request.mode === 'navigate') {
             return caches.match('/index.html');
           }

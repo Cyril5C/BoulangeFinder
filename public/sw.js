@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boulanges-finder-v17';
+const CACHE_NAME = 'boulanges-finder-v18';
 const STATIC_ASSETS = [
   '/app.js',
   '/style.css',
@@ -57,13 +57,17 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
 
         try {
-          const response = await fetch(event.request);
+          // Force cors mode so the response is never opaque (status 0)
+          // and can actually be stored in the cache
+          const response = await fetch(new Request(event.request.url, {
+            mode: 'cors',
+            credentials: 'omit'
+          }));
           if (response.ok) {
             cache.put(event.request, response.clone());
           }
           return response;
         } catch (e) {
-          // Return a placeholder tile or nothing
           return new Response('', { status: 408 });
         }
       })

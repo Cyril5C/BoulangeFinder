@@ -184,7 +184,7 @@ async function cacheTrackTiles(track) {
   btn.disabled = true;
   let n = 0;
   for (const url of urls) {
-    try { await fetch(url, { mode: 'no-cors' }); } catch (e) {}
+    try { await fetch(url); } catch (e) {}
     n++;
     if (n % 5 === 0) {
       btn.textContent = `📥 ${Math.round(n / urls.length * 100)}%`;

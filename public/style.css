@@ -768,22 +768,17 @@ body.offline .map-section {
 }
 
 
-.poi-nav-links {
-  display: flex;
-  gap: 12px;
+.nav-link-gmaps {
+  display: block;
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid #eee;
-}
-
-.nav-link {
   font-size: 0.8rem;
   text-decoration: none;
-  color: #666;
+  color: #4285f4;
 }
 
-.nav-link:hover {
-  color: #333;
+.nav-link-gmaps:hover {
   text-decoration: underline;
 }
 

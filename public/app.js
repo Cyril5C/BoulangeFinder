@@ -905,11 +905,7 @@ function createPopupContent(poi) {
   }
 
   if (poi.type !== 'borne') {
-    html += `<div class="poi-nav-links">
-      <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'google', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Google Maps</a>
-      <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'apple', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Apple Plans</a>
-      <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'comaps', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Comaps</a>
-    </div>`;
+    html += `<a href="https://www.google.com/maps?q=${poi.lat},${poi.lon}" target="_blank" rel="noopener" class="nav-link-gmaps">Voir sur Google Maps</a>`;
   }
 
   if (poi.isCustom) {
@@ -933,52 +929,6 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
-}
-
-function navigateTo(destLat, destLon, app, name) {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const startLat = position.coords.latitude;
-        const startLon = position.coords.longitude;
-        openNavApp(startLat, startLon, destLat, destLon, app, name);
-      },
-      () => {
-        // Fallback sans géolocalisation
-        openNavApp(null, null, destLat, destLon, app, name);
-      },
-      { timeout: 5000, maximumAge: 60000 }
-    );
-  } else {
-    openNavApp(null, null, destLat, destLon, app, name);
-  }
-}
-
-function openNavApp(startLat, startLon, destLat, destLon, app, name) {
-  let url;
-
-  switch (app) {
-    case 'google':
-      if (startLat && startLon) {
-        url = `https://www.google.com/maps/dir/?api=1&origin=${startLat},${startLon}&destination=${destLat},${destLon}&travelmode=bicycling`;
-      } else {
-        url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLon}&travelmode=bicycling`;
-      }
-      break;
-    case 'apple':
-      url = `https://maps.apple.com/?daddr=${destLat},${destLon}&dirflg=w`;
-      break;
-    case 'comaps':
-      if (startLat && startLon) {
-        url = `https://comaps.at/route?sll=${startLat},${startLon}&dll=${destLat},${destLon}&type=bicycle`;
-      } else {
-        // Sans position de départ, ouvrir juste le point sur la carte
-        url = `https://comaps.at/@${destLat},${destLon},17z`;
-      }
-      break;
-  }
-
-  window.open(url, '_blank');
 }
 
 // Geolocation button — one-shot position

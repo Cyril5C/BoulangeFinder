@@ -16,7 +16,6 @@ let selectedPoiTypes = [];
 let userLocationMarker = null;
 let distanceMarkers = [];
 let isOffline = !navigator.onLine;
-let filterDay = ''; // '', 'now', 'Mo', 'Tu', etc.
 let allPoiMarkers = [];
 let activePoiTypeFilters = new Set();
 let favoritePois = new Set();
@@ -799,7 +798,6 @@ async function showMap(data) {
   // Restore filters
   buildTypeFilterPanel({ pois: allPoiMarkers.map(e => e.poi) });
   if (showOnlyFavorites) applyFavoritesFilter();
-  if (filterDay) applyDayFilter();
 
   // Fit bounds
   map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
@@ -1106,7 +1104,6 @@ document.getElementById('fav-filter-btn').addEventListener('click', () => {
       const layer = poiLayers[type];
       if (layer && !layer.hasLayer(marker)) layer.addLayer(marker);
     });
-    if (filterDay) applyDayFilter();
     // Re-apply type filters
     Object.keys(poiLayers).forEach(type => {
       if (type === 'borne') return;
@@ -1158,12 +1155,6 @@ document.getElementById('add-poi-modal').addEventListener('click', (e) => {
 
 // Map click → add custom POI
 // (initialized after map is created in showMap)
-
-// Day filter change
-document.getElementById('day-filter').addEventListener('change', (e) => {
-  filterDay = e.target.value;
-  applyDayFilter();
-});
 
 function buildTypeFilterPanel(data) {
   const panel = document.getElementById('poi-type-filter');
@@ -1218,60 +1209,10 @@ function toggleTypeFilter(type, btn) {
     }
     if (showOnlyFavorites) {
       applyFavoritesFilter();
-    } else if (filterDay) {
-      applyDayFilter();
     }
   }
 }
 
-function applyDayFilter() {
-  allPoiMarkers.forEach(({ marker, poi, type }) => {
-    // Water and toilets are always "open"
-    if (type === 'water' || type === 'toilets') {
-      if (!poiLayers[type].hasLayer(marker)) {
-        poiLayers[type].addLayer(marker);
-      }
-      return;
-    }
-
-    // No filter = show all
-    if (!filterDay) {
-      if (!poiLayers[type].hasLayer(marker)) {
-        poiLayers[type].addLayer(marker);
-      }
-      return;
-    }
-
-    // If no opening hours, keep visible (unknown = show)
-    if (!poi.tags?.opening_hours) {
-      if (!poiLayers[type].hasLayer(marker)) {
-        poiLayers[type].addLayer(marker);
-      }
-      return;
-    }
-
-    let isOpen;
-    if (filterDay === 'now') {
-      // Use pre-computed isOpenNow from server if boolean, otherwise fallback to client parser
-      if (typeof poi.isOpenNow === 'boolean') {
-        isOpen = poi.isOpenNow;
-      } else {
-        isOpen = isOpenNow(poi.tags.opening_hours);
-      }
-    } else {
-      // Check if open on specific day
-      isOpen = isOpenOnDay(poi.tags.opening_hours, filterDay);
-    }
-
-    if (isOpen) {
-      if (!poiLayers[type].hasLayer(marker)) {
-        poiLayers[type].addLayer(marker);
-      }
-    } else {
-      poiLayers[type].removeLayer(marker);
-    }
-  });
-}
 
 // Export functions
 document.getElementById('export-gpx').addEventListener('click', () => exportPOIs('gpx'));
@@ -1486,7 +1427,6 @@ function formatOpeningHours(osmHours) {
   return formatted;
 }
 
-// Check if a POI is open on a specific day (any time during that day)
 function isOpenOnDay(openingHours, targetDay) {
   if (!openingHours) return false;
   if (openingHours === '24/7') return true;
@@ -1562,7 +1502,6 @@ function isOpenOnDay(openingHours, targetDay) {
   return false;
 }
 
-// Check if a POI is currently open based on OSM opening_hours
 function isOpenNow(openingHours) {
   if (!openingHours) return false; // Unknown = assume closed for filtering
   if (openingHours === '24/7') return true;

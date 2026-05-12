@@ -1617,15 +1617,15 @@ function generateRoadmapImage() {
     return { poi, distDone: pos.distDone ?? 0, distRemaining: pos.distRemaining ?? 0 };
   }).sort((a, b) => a.distDone - b.distDone);
 
-  // Canvas en pixels physiques iPhone 16 (@3×, 393pt de large = 1179px)
-  // Le canvas est dessiné directement en pixels physiques, sans ctx.scale.
+  // Pixels physiques iPhone 16 : 1179 × 2556 px (@3×, 393 × 852 pt)
+  // Fond sombre pour lisibilité en plein soleil en roulant.
   const W = 1179;
-  const ROW_H = 148;
-  const HEADER_H = 200;
   const nRows = sorted.length + 2; // départ + favoris + arrivée
+  const HEADER_H = 280;
+  // Rows s'étirent pour remplir l'écran (min 380px chacune)
+  const ROW_H = Math.max(380, Math.floor((2556 - HEADER_H - 40) / nRows));
   const H = HEADER_H + nRows * ROW_H + 40;
-  const PAD = 72;
-  const KM_W = 190;
+  const PAD = 64;
   const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
 
   const canvas = document.createElement('canvas');
@@ -1633,8 +1633,8 @@ function generateRoadmapImage() {
   canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  // Background
-  ctx.fillStyle = '#f3f4f6';
+  // Fond très sombre — contraste maximal en plein soleil
+  ctx.fillStyle = '#0d1117';
   ctx.fillRect(0, 0, W, H);
 
   // Header gradient
@@ -1644,78 +1644,108 @@ function generateRoadmapImage() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, HEADER_H);
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold 52px ${FONT}`;
-  ctx.fillText('Roadmap', PAD, 86);
-  ctx.font = `34px ${FONT}`;
+  ctx.font = `bold 88px ${FONT}`;
+  ctx.fillText('Roadmap', PAD, 110);
+  ctx.font = `48px ${FONT}`;
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.fillText(`${totalKm} km  ·  ${sorted.length} favori${sorted.length > 1 ? 's' : ''}`, PAD, 148);
+  ctx.fillText(`${totalKm} km  ·  ${sorted.length} favori${sorted.length > 1 ? 's' : ''}`, PAD, 196);
 
-  function kmBadge(x, y, text, special) {
-    const r = 30, bh = 66;
-    ctx.fillStyle = special ? '#667eea' : '#dbeafe';
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + KM_W - r, y);
-    ctx.arcTo(x + KM_W, y, x + KM_W, y + r, r);
-    ctx.lineTo(x + KM_W, y + bh - r);
-    ctx.arcTo(x + KM_W, y + bh, x + KM_W - r, y + bh, r);
-    ctx.lineTo(x + r, y + bh);
-    ctx.arcTo(x, y + bh, x, y + bh - r, r);
-    ctx.lineTo(x, y + r);
-    ctx.arcTo(x, y, x + r, y, r);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = special ? '#ffffff' : '#1d4ed8';
-    ctx.font = `bold 30px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(text, x + KM_W / 2, y + 42);
-    ctx.textAlign = 'left';
-  }
-
-  function drawRow(idx, kmText, line1, line2, special) {
-    const y = HEADER_H + idx * ROW_H;
-    ctx.fillStyle = special ? '#eef2ff' : (idx % 2 === 0 ? '#ffffff' : '#f9fafb');
-    ctx.fillRect(0, y, W, ROW_H);
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, y + ROW_H); ctx.lineTo(W, y + ROW_H); ctx.stroke();
-
-    kmBadge(PAD, y + (ROW_H - 66) / 2, kmText, special);
-
-    const tx = PAD + KM_W + 44;
-    const maxW = W - tx - PAD;
-    if (special) {
-      ctx.fillStyle = '#111827';
-      ctx.font = `bold 38px ${FONT}`;
-      ctx.fillText(line1, tx, y + ROW_H / 2 + 14);
-    } else {
-      ctx.fillStyle = '#111827';
-      ctx.font = `bold 34px ${FONT}`;
-      ctx.fillText(clampText(ctx, line1, maxW), tx, y + 56);
-      ctx.fillStyle = '#6b7280';
-      ctx.font = `28px ${FONT}`;
-      ctx.fillText(line2, tx, y + 100);
-    }
-  }
-
-  function clampText(ctx, text, maxW) {
+  function clampText(text, maxW, fontSize) {
+    ctx.font = `bold ${fontSize}px ${FONT}`;
     if (ctx.measureText(text).width <= maxW) return text;
     while (text.length > 1 && ctx.measureText(text + '…').width > maxW) text = text.slice(0, -1);
     return text + '…';
   }
 
-  drawRow(0, `${totalKm}km`, 'Départ', '', true);
+  function drawRow(idx, kmNum, kmUnit, emoji, nameLine, distLine, special) {
+    const y = HEADER_H + idx * ROW_H;
+
+    // Background
+    ctx.fillStyle = special ? '#161b27' : (idx % 2 === 0 ? '#0d1117' : '#111827');
+    ctx.fillRect(0, y, W, ROW_H);
+
+    // Separator
+    ctx.strokeStyle = '#1e2d40';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
+
+    const midY = y + ROW_H / 2;
+
+    if (special) {
+      // Départ / Arrivée : km très grand + label centré verticalement
+      ctx.fillStyle = '#c7d2fe';
+      ctx.font = `bold 160px ${FONT}`;
+      ctx.textAlign = 'left';
+      ctx.fillText(kmNum, PAD, midY + 56);
+      ctx.fillStyle = '#818cf8';
+      ctx.font = `bold 64px ${FONT}`;
+      ctx.fillText(kmUnit, PAD, midY + 130);
+      ctx.fillStyle = '#f1f5f9';
+      ctx.font = `bold 72px ${FONT}`;
+      ctx.textAlign = 'right';
+      ctx.fillText(nameLine, W - PAD, midY + 28);
+      ctx.textAlign = 'left';
+    } else {
+      // Km (très grand, colonne gauche)
+      const KM_COL = 420;
+      ctx.fillStyle = '#c7d2fe';
+      ctx.font = `bold 170px ${FONT}`;
+      ctx.textAlign = 'right';
+      ctx.fillText(kmNum, KM_COL, midY + 54);
+      ctx.fillStyle = '#818cf8';
+      ctx.font = `bold 58px ${FONT}`;
+      ctx.fillText(kmUnit, KM_COL - ctx.measureText(kmUnit).width - 4, midY + 124);
+      ctx.textAlign = 'left';
+
+      // Séparateur vertical
+      ctx.strokeStyle = '#1e2d40';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(KM_COL + 36, y + 40); ctx.lineTo(KM_COL + 36, y + ROW_H - 40); ctx.stroke();
+
+      // Colonne droite : emoji + nom + distance
+      const RX = KM_COL + 72;
+      const maxNameW = W - RX - PAD;
+
+      // Emoji très grand
+      ctx.font = `${Math.round(ROW_H * 0.34)}px sans-serif`;
+      ctx.fillText(emoji, RX, midY + 12);
+      const emojiW = ctx.measureText(emoji).width;
+
+      // Nom
+      const nameX = RX + emojiW + 28;
+      const nameSize = Math.round(ROW_H * 0.165);
+      const name = clampText(nameLine, W - nameX - PAD, nameSize);
+      ctx.fillStyle = '#f1f5f9';
+      ctx.font = `bold ${nameSize}px ${FONT}`;
+      ctx.fillText(name, nameX, midY - 14);
+
+      // Distance de la trace
+      ctx.fillStyle = '#64748b';
+      ctx.font = `${Math.round(ROW_H * 0.115)}px ${FONT}`;
+      ctx.fillText(distLine, nameX, midY + nameSize * 0.8);
+    }
+  }
+
+  const km0 = String(Math.floor(totalKm));
+  const km0dec = totalKm % 1 ? '.' + String(Math.round((totalKm % 1) * 10)) : '';
+  drawRow(0, km0 + km0dec, 'km', '', 'Départ', '', true);
+
   sorted.forEach(({ poi, distRemaining }, i) => {
     const meta = POI_META[poi.type] || { label: poi.type, emoji: '📍' };
+    const km = String(distRemaining).replace('.', '.');
+    const [kmInt, kmDec] = km.split('.');
     drawRow(
       i + 1,
-      `${distRemaining}km`,
-      `${meta.emoji}  ${meta.label} · ${poi.name}`,
-      `à ${poi.distance}m de la trace`,
+      kmDec ? `${kmInt}.${kmDec}` : kmInt,
+      'km',
+      meta.emoji,
+      poi.name,
+      `${meta.label}  ·  à ${poi.distance}m`,
       false
     );
   });
-  drawRow(sorted.length + 1, '0km', 'Arrivée', '', true);
+
+  drawRow(sorted.length + 1, '0', 'km', '', 'Arrivée', '', true);
 
   // Download
   const dataUrl = canvas.toDataURL('image/png');

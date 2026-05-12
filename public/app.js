@@ -1617,22 +1617,21 @@ function generateRoadmapImage() {
     return { poi, distDone: pos.distDone ?? 0, distRemaining: pos.distRemaining ?? 0 };
   }).sort((a, b) => a.distDone - b.distDone);
 
-  // Canvas setup — 2× for retina
-  const DPR = 2;
-  const W = 640;
-  const ROW_H = 58;
-  const HEADER_H = 76;
+  // Canvas en pixels physiques iPhone 16 (@3×, 393pt de large = 1179px)
+  // Le canvas est dessiné directement en pixels physiques, sans ctx.scale.
+  const W = 1179;
+  const ROW_H = 148;
+  const HEADER_H = 200;
   const nRows = sorted.length + 2; // départ + favoris + arrivée
-  const H = HEADER_H + nRows * ROW_H + 16;
-  const PAD = 28;
-  const KM_W = 76;
+  const H = HEADER_H + nRows * ROW_H + 40;
+  const PAD = 72;
+  const KM_W = 190;
   const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
 
   const canvas = document.createElement('canvas');
-  canvas.width = W * DPR;
-  canvas.height = H * DPR;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d');
-  ctx.scale(DPR, DPR);
 
   // Background
   ctx.fillStyle = '#f3f4f6';
@@ -1645,14 +1644,14 @@ function generateRoadmapImage() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, HEADER_H);
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold 20px ${FONT}`;
-  ctx.fillText('Roadmap', PAD, 34);
-  ctx.font = `13px ${FONT}`;
+  ctx.font = `bold 52px ${FONT}`;
+  ctx.fillText('Roadmap', PAD, 86);
+  ctx.font = `34px ${FONT}`;
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.fillText(`${totalKm} km  ·  ${sorted.length} favori${sorted.length > 1 ? 's' : ''}`, PAD, 57);
+  ctx.fillText(`${totalKm} km  ·  ${sorted.length} favori${sorted.length > 1 ? 's' : ''}`, PAD, 148);
 
   function kmBadge(x, y, text, special) {
-    const r = 12, bh = 26;
+    const r = 30, bh = 66;
     ctx.fillStyle = special ? '#667eea' : '#dbeafe';
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -1667,9 +1666,9 @@ function generateRoadmapImage() {
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = special ? '#ffffff' : '#1d4ed8';
-    ctx.font = `bold 12px monospace`;
+    ctx.font = `bold 30px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(text, x + KM_W / 2, y + 17);
+    ctx.fillText(text, x + KM_W / 2, y + 42);
     ctx.textAlign = 'left';
   }
 
@@ -1678,24 +1677,24 @@ function generateRoadmapImage() {
     ctx.fillStyle = special ? '#eef2ff' : (idx % 2 === 0 ? '#ffffff' : '#f9fafb');
     ctx.fillRect(0, y, W, ROW_H);
     ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 0.5;
+    ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, y + ROW_H); ctx.lineTo(W, y + ROW_H); ctx.stroke();
 
-    kmBadge(PAD, y + (ROW_H - 26) / 2, kmText, special);
+    kmBadge(PAD, y + (ROW_H - 66) / 2, kmText, special);
 
-    const tx = PAD + KM_W + 18;
+    const tx = PAD + KM_W + 44;
     const maxW = W - tx - PAD;
     if (special) {
       ctx.fillStyle = '#111827';
-      ctx.font = `bold 15px ${FONT}`;
-      ctx.fillText(line1, tx, y + ROW_H / 2 + 6);
+      ctx.font = `bold 38px ${FONT}`;
+      ctx.fillText(line1, tx, y + ROW_H / 2 + 14);
     } else {
       ctx.fillStyle = '#111827';
-      ctx.font = `bold 14px ${FONT}`;
-      ctx.fillText(clampText(ctx, line1, maxW), tx, y + 24);
+      ctx.font = `bold 34px ${FONT}`;
+      ctx.fillText(clampText(ctx, line1, maxW), tx, y + 56);
       ctx.fillStyle = '#6b7280';
-      ctx.font = `12px ${FONT}`;
-      ctx.fillText(line2, tx, y + 40);
+      ctx.font = `28px ${FONT}`;
+      ctx.fillText(line2, tx, y + 100);
     }
   }
 

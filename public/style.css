@@ -9,6 +9,8 @@ body {
   background: #f5f5f5;
   min-height: 100vh;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Upload Section */
@@ -214,6 +216,7 @@ body {
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   -webkit-appearance: none;
+  touch-action: manipulation;
 }
 
 .submit-btn:hover {
@@ -414,6 +417,7 @@ body {
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: background 0.2s, transform 0.1s;
+  touch-action: manipulation;
 }
 
 .control-btn:hover {
@@ -457,6 +461,7 @@ body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   transition: opacity 0.2s, transform 0.1s;
   color: white;
+  touch-action: manipulation;
 }
 
 .poi-filter-btn:active {
@@ -499,6 +504,7 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   transition: background 0.2s, transform 0.1s;
+  touch-action: manipulation;
 }
 
 .geoloc-btn:hover {
@@ -771,6 +777,7 @@ body.offline .map-section {
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s, transform 0.1s;
+  touch-action: manipulation;
 }
 
 .modal-btn:active { transform: scale(0.97); }
@@ -911,10 +918,10 @@ body.offline .map-section {
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
 
-  /* Upload page */
+  /* Upload page — account for Dynamic Island / notch */
   .upload-section {
     align-items: flex-start;
-    padding: 12px 12px env(safe-area-inset-bottom, 12px);
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
 
   .upload-container {
@@ -1028,6 +1035,23 @@ body.offline .map-section {
   .modal-content {
     max-width: 100%;
     margin: 0 4px;
+  }
+
+  /* Prevent iOS Safari zoom on input focus (font-size must be >= 16px) */
+  .modal-content input,
+  .modal-content select,
+  .modal-content textarea {
+    font-size: 16px;
+  }
+
+  /* Offline badge — above home indicator */
+  .offline-badge {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  }
+
+  /* Offline toast — above geoloc button */
+  .offline-toast {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 106px);
   }
 }
 

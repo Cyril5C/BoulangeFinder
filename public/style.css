@@ -425,7 +425,7 @@ body {
 /* POI type filter panel */
 .poi-type-filter {
   position: absolute;
-  bottom: 30px;
+  bottom: 52px;
   left: 10px;
   display: flex;
   gap: 6px;

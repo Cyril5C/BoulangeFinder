@@ -1181,13 +1181,14 @@ function buildTypeFilterPanel(data) {
     return;
   }
 
-  activePoiTypeFilters = new Set(types);
+  // All chips inactive by default — user enables what they want
+  activePoiTypeFilters = new Set();
 
   types.forEach(type => {
     const meta = POI_META[type];
     if (!meta) return;
     const btn = document.createElement('button');
-    btn.className = `poi-filter-btn ${type} active`;
+    btn.className = `poi-filter-btn ${type} inactive`;
     btn.dataset.type = type;
     btn.innerHTML = `${meta.emoji} ${meta.label} <span class="filter-count">${typeCounts[type]}</span>`;
     btn.addEventListener('click', () => toggleTypeFilter(type, btn));
@@ -1202,7 +1203,10 @@ function toggleTypeFilter(type, btn) {
     activePoiTypeFilters.delete(type);
     btn.classList.remove('active');
     btn.classList.add('inactive');
-    if (poiLayers[type] && map.hasLayer(poiLayers[type])) {
+    // Only hide layer if favorites filter is off, or re-apply favorites to keep favorites visible
+    if (showOnlyFavorites) {
+      applyFavoritesFilter();
+    } else if (poiLayers[type] && map.hasLayer(poiLayers[type])) {
       map.removeLayer(poiLayers[type]);
     }
   } else {
@@ -1211,7 +1215,11 @@ function toggleTypeFilter(type, btn) {
     btn.classList.add('active');
     if (poiLayers[type] && !map.hasLayer(poiLayers[type])) {
       poiLayers[type].addTo(map);
-      if (filterDay) applyDayFilter();
+    }
+    if (showOnlyFavorites) {
+      applyFavoritesFilter();
+    } else if (filterDay) {
+      applyDayFilter();
     }
   }
 }

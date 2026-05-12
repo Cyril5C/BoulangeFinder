@@ -782,9 +782,9 @@ async function showMap(data) {
   // Draw track
   const trackCoords = data.track.map(p => [p.lat, p.lon]);
   trackLayer = L.polyline(trackCoords, {
-    color: '#667eea',
+    color: '#1a3a6b',
     weight: 4,
-    opacity: 0.8
+    opacity: 0.9
   }).addTo(map);
 
   // Create POI layers

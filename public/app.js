@@ -1617,20 +1617,18 @@ function generateRoadmapImage() {
     return { poi, distDone: pos.distDone ?? 0, distRemaining: pos.distRemaining ?? 0 };
   }).sort((a, b) => a.distDone - b.distDone);
 
-  // Pixels physiques iPhone 16 : 1179 × 2556 px (@3×, 393 × 852 pt)
-  // Fond sombre pour lisibilité en plein soleil en roulant.
+  // Taille exacte fond d'écran iPhone 16 : 1179 × 2556 px
   const W = 1179;
+  const H = 2556;
   const nRows = sorted.length + 2; // départ + favoris + arrivée
   const HEADER_H = 280;
-  // Rows s'étirent pour remplir l'écran (min 380px chacune)
-  const ROW_H = Math.max(380, Math.floor((2556 - HEADER_H - 40) / nRows));
-  const H = HEADER_H + nRows * ROW_H + 40;
+  const ROW_H = Math.floor((H - HEADER_H) / nRows);
   const PAD = 64;
   const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
 
   const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = W;   // 1179 px — largeur exacte iPhone 16
+  canvas.height = H;  // 2556 px — hauteur exacte iPhone 16
   const ctx = canvas.getContext('2d');
 
   // Fond très sombre — contraste maximal en plein soleil

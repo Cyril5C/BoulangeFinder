@@ -203,6 +203,8 @@ function showOfflineToast() {
     toast.classList.add('fade-out');
     setTimeout(() => toast.classList.add('hidden'), 400);
   }, 3000);
+
+  document.getElementById('offline-badge').classList.remove('hidden');
 }
 
 const POI_META = {
@@ -831,9 +833,10 @@ async function showMap(data) {
   favBtn.textContent = showOnlyFavorites ? '⭐' : '☆';
   favBtn.classList.toggle('active', showOnlyFavorites);
 
-  // Reset cache button
+  // Reset cache button and offline badge
   const cacheBtn = document.getElementById('cache-offline-btn');
   if (cacheBtn) { cacheBtn.textContent = '📥'; cacheBtn.disabled = false; }
+  document.getElementById('offline-badge').classList.add('hidden');
 }
 
 function placePoiMarker(poi) {

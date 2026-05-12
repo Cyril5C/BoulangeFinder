@@ -1643,9 +1643,10 @@ function generateRoadmapImage() {
   grad.addColorStop(1, '#764ba2');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, HEADER_H);
+  const traceTitle = (currentData.filename || 'Roadmap').replace(/\.gpx$/i, '');
   ctx.fillStyle = '#ffffff';
   ctx.font = `bold 88px ${FONT}`;
-  ctx.fillText('Roadmap', PAD, 110);
+  ctx.fillText(clampText(traceTitle, W - PAD * 2, 88), PAD, 110);
   ctx.font = `48px ${FONT}`;
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.fillText(`${totalKm} km  ·  ${sorted.length} favori${sorted.length > 1 ? 's' : ''}`, PAD, 196);

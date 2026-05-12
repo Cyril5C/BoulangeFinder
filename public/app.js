@@ -20,7 +20,7 @@ let filterDay = ''; // '', 'now', 'Mo', 'Tu', etc.
 let allPoiMarkers = [];
 let activePoiTypeFilters = new Set();
 let favoritePois = new Set();
-let showOnlyFavorites = false;
+let showOnlyFavorites = true;
 let markerByPoiId = new Map();
 let customPois = [];
 let currentTraceKey = null;
@@ -817,6 +817,11 @@ async function showMap(data) {
     });
     map._addPoiListenerRegistered = true;
   }
+
+  // Sync fav filter button visual state
+  const favBtn = document.getElementById('fav-filter-btn');
+  favBtn.textContent = showOnlyFavorites ? '⭐' : '☆';
+  favBtn.classList.toggle('active', showOnlyFavorites);
 
   // Reset cache button
   const cacheBtn = document.getElementById('cache-offline-btn');

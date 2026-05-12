@@ -1701,7 +1701,7 @@ function generateRoadmapImage(startKm, endKm) {
       ctx.fillText(kmNum, KM_COL, midY + 54);
       ctx.fillStyle = '#818cf8';
       ctx.font = `bold 58px ${FONT}`;
-      ctx.fillText(kmUnit, KM_COL - ctx.measureText(kmUnit).width - 4, midY + 124);
+      ctx.fillText(kmUnit, KM_COL, midY + 124);
       ctx.textAlign = 'left';
 
       // Séparateur vertical

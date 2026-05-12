@@ -256,7 +256,21 @@ function generateBornes(trackPoints, intervalMeters = 10000) {
   }
   const totalMeters = cumDist[cumDist.length - 1];
 
+  const totalKm = Math.round(totalMeters / 1000);
   const bornes = [];
+
+  // Start marker showing total distance
+  bornes.push({
+    id: 'borne-start',
+    lat: trackPoints[0].lat,
+    lon: trackPoints[0].lon,
+    type: 'borne',
+    name: `${totalKm}`,
+    distance: 0,
+    tags: {},
+    isOpenNow: null
+  });
+
   // Iterate every 10km from START; remaining = total - distanceDone
   for (let distDone = intervalMeters; distDone < totalMeters; distDone += intervalMeters) {
     const remainingMeters = totalMeters - distDone;
@@ -284,6 +298,19 @@ function generateBornes(trackPoints, intervalMeters = 10000) {
       isOpenNow: null
     });
   }
+
+  // Add finish marker at the last track point
+  const last = trackPoints[trackPoints.length - 1];
+  bornes.push({
+    id: 'borne-finish',
+    lat: last.lat,
+    lon: last.lon,
+    type: 'borne',
+    name: '0',
+    distance: 0,
+    tags: {},
+    isOpenNow: null
+  });
 
   return bornes;
 }

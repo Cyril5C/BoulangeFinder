@@ -94,8 +94,8 @@ app.use((req, res, next) => {
     return res.status(401).json({ error: 'Non authentifié' });
   }
 
-  // Redirect to login
-  res.redirect('/login');
+  // Serve login page inline (no redirect — keeps PWA in standalone mode on iOS)
+  res.sendFile(path.join(__dirname, '../public/login.html'));
 });
 
 // Protected static files

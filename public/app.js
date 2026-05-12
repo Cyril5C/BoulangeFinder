@@ -856,10 +856,19 @@ function createPopupContent(poi) {
     borne: 'Borne kilométrique'
   };
 
+  const { distDone, distRemaining } = (currentData?.track)
+    ? getTrackPosition(poi, currentData.track)
+    : { distDone: null, distRemaining: null };
+
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
     <h4>${escapeHtml(poi.name)}</h4>
-    <p>Distance du parcours: ${poi.distance}m</p>`;
+    <p>↔ ${poi.distance}m de la trace`;
+
+  if (distDone !== null) {
+    html += ` · 🚴 ${distDone} km parcourus · ${distRemaining} km restants`;
+  }
+  html += `</p>`;
 
   if (poi.tags?.opening_hours) {
     const hours = formatOpeningHours(poi.tags.opening_hours);

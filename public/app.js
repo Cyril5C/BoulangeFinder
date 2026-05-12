@@ -1101,7 +1101,25 @@ document.getElementById('cache-offline-btn').addEventListener('click', () => {
 });
 
 document.getElementById('roadmap-btn').addEventListener('click', () => {
-  generateRoadmapImage();
+  if (!currentData?.track) return;
+  let totalM = 0;
+  const t = currentData.track;
+  for (let i = 1; i < t.length; i++) totalM += haversineDistance(t[i-1].lat, t[i-1].lon, t[i].lat, t[i].lon);
+  const totalKm = Math.round(totalM / 100) / 10;
+  document.getElementById('roadmap-start').value = 0;
+  document.getElementById('roadmap-end').value = totalKm;
+  document.getElementById('roadmap-modal').classList.remove('hidden');
+});
+
+document.getElementById('cancel-roadmap').addEventListener('click', () => {
+  document.getElementById('roadmap-modal').classList.add('hidden');
+});
+
+document.getElementById('confirm-roadmap').addEventListener('click', () => {
+  const startKm = parseFloat(document.getElementById('roadmap-start').value) || 0;
+  const endKm   = parseFloat(document.getElementById('roadmap-end').value);
+  document.getElementById('roadmap-modal').classList.add('hidden');
+  generateRoadmapImage(startKm, endKm);
 });
 
 // Custom POI modal
@@ -1593,7 +1611,7 @@ function isOpenNow(openingHours) {
   return false;
 }
 
-function generateRoadmapImage() {
+function generateRoadmapImage(startKm, endKm) {
   if (!currentData) return;
   const favorites = (currentData.pois || []).filter(p => favoritePois.has(String(p.id)));
 
@@ -1604,18 +1622,23 @@ function generateRoadmapImage() {
 
   const track = currentData.track;
 
-  // Total track distance in km
-  let totalM = 0;
-  for (let i = 1; i < track.length; i++) {
-    totalM += haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon);
-  }
-  const totalKm = Math.round(totalM / 100) / 10;
-
-  // Sort favorites by position along track (start → end)
-  const sorted = favorites.map(poi => {
+  // Sort all favorites by position along track
+  const all = favorites.map(poi => {
     const pos = getTrackPosition(poi, track);
-    return { poi, distDone: pos.distDone ?? 0, distRemaining: pos.distRemaining ?? 0 };
+    return { poi, distDone: pos.distDone ?? 0 };
   }).sort((a, b) => a.distDone - b.distDone);
+
+  // Clamp to the requested segment
+  const segEnd = endKm ?? (all.length ? all[all.length-1].distDone + 1 : 999);
+  const sorted = all
+    .filter(({ distDone }) => distDone >= startKm && distDone <= segEnd)
+    .map(({ poi, distDone }) => ({
+      poi,
+      distDone,
+      distRemaining: Math.round((segEnd - distDone) * 10) / 10
+    }));
+
+  const segLength = Math.round((segEnd - startKm) * 10) / 10;
 
   // Taille exacte fond d'écran iPhone 16 : 1179 × 2556 px
   const W = 1179;
@@ -1710,8 +1733,8 @@ function generateRoadmapImage() {
     }
   }
 
-  const km0 = String(Math.floor(totalKm));
-  const km0dec = totalKm % 1 ? '.' + String(Math.round((totalKm % 1) * 10)) : '';
+  const km0 = String(Math.floor(segLength));
+  const km0dec = segLength % 1 ? '.' + String(Math.round((segLength % 1) * 10)) : '';
   drawRow(0, km0 + km0dec, 'km', '', 'Départ', '', true);
 
   sorted.forEach(({ poi, distRemaining }, i) => {

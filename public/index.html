@@ -140,6 +140,27 @@
       </button>
     </div>
 
+    <!-- Roadmap range modal -->
+    <div id="roadmap-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Bornes de la roadmap</h3>
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1">
+            <label style="font-size:0.8rem;color:#6b7280;display:block;margin-bottom:4px;">Début (km)</label>
+            <input type="number" id="roadmap-start" min="0" step="0.1">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:0.8rem;color:#6b7280;display:block;margin-bottom:4px;">Fin (km)</label>
+            <input type="number" id="roadmap-end" min="0" step="0.1">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="cancel-roadmap" class="modal-btn modal-btn-cancel">Annuler</button>
+          <button id="confirm-roadmap" class="modal-btn modal-btn-confirm">Générer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Add custom POI modal -->
     <div id="add-poi-modal" class="modal hidden">
       <div class="modal-content">

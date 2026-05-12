@@ -1100,6 +1100,10 @@ document.getElementById('cache-offline-btn').addEventListener('click', () => {
   if (currentData?.track) cacheTrackTiles(currentData.track);
 });
 
+document.getElementById('roadmap-btn').addEventListener('click', () => {
+  generateRoadmapImage();
+});
+
 // Custom POI modal
 document.getElementById('cancel-add-poi').addEventListener('click', () => {
   document.getElementById('add-poi-modal').classList.add('hidden');
@@ -1587,6 +1591,141 @@ function isOpenNow(openingHours) {
   }
 
   return false;
+}
+
+function generateRoadmapImage() {
+  if (!currentData) return;
+  const favorites = (currentData.pois || []).filter(p => favoritePois.has(String(p.id)));
+
+  if (!favorites.length) {
+    alert('Aucun favori. Marque des POIs en favori (★) sur la carte.');
+    return;
+  }
+
+  const track = currentData.track;
+
+  // Total track distance in km
+  let totalM = 0;
+  for (let i = 1; i < track.length; i++) {
+    totalM += haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon);
+  }
+  const totalKm = Math.round(totalM / 100) / 10;
+
+  // Sort favorites by position along track (start → end)
+  const sorted = favorites.map(poi => {
+    const pos = getTrackPosition(poi, track);
+    return { poi, distDone: pos.distDone ?? 0, distRemaining: pos.distRemaining ?? 0 };
+  }).sort((a, b) => a.distDone - b.distDone);
+
+  // Canvas setup — 2× for retina
+  const DPR = 2;
+  const W = 640;
+  const ROW_H = 58;
+  const HEADER_H = 76;
+  const nRows = sorted.length + 2; // départ + favoris + arrivée
+  const H = HEADER_H + nRows * ROW_H + 16;
+  const PAD = 28;
+  const KM_W = 76;
+  const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+
+  // Background
+  ctx.fillStyle = '#f3f4f6';
+  ctx.fillRect(0, 0, W, H);
+
+  // Header gradient
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, '#667eea');
+  grad.addColorStop(1, '#764ba2');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, HEADER_H);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold 20px ${FONT}`;
+  ctx.fillText('Roadmap', PAD, 34);
+  ctx.font = `13px ${FONT}`;
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText(`${totalKm} km  ·  ${sorted.length} favori${sorted.length > 1 ? 's' : ''}`, PAD, 57);
+
+  function kmBadge(x, y, text, special) {
+    const r = 12, bh = 26;
+    ctx.fillStyle = special ? '#667eea' : '#dbeafe';
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + KM_W - r, y);
+    ctx.arcTo(x + KM_W, y, x + KM_W, y + r, r);
+    ctx.lineTo(x + KM_W, y + bh - r);
+    ctx.arcTo(x + KM_W, y + bh, x + KM_W - r, y + bh, r);
+    ctx.lineTo(x + r, y + bh);
+    ctx.arcTo(x, y + bh, x, y + bh - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = special ? '#ffffff' : '#1d4ed8';
+    ctx.font = `bold 12px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(text, x + KM_W / 2, y + 17);
+    ctx.textAlign = 'left';
+  }
+
+  function drawRow(idx, kmText, line1, line2, special) {
+    const y = HEADER_H + idx * ROW_H;
+    ctx.fillStyle = special ? '#eef2ff' : (idx % 2 === 0 ? '#ffffff' : '#f9fafb');
+    ctx.fillRect(0, y, W, ROW_H);
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(0, y + ROW_H); ctx.lineTo(W, y + ROW_H); ctx.stroke();
+
+    kmBadge(PAD, y + (ROW_H - 26) / 2, kmText, special);
+
+    const tx = PAD + KM_W + 18;
+    const maxW = W - tx - PAD;
+    if (special) {
+      ctx.fillStyle = '#111827';
+      ctx.font = `bold 15px ${FONT}`;
+      ctx.fillText(line1, tx, y + ROW_H / 2 + 6);
+    } else {
+      ctx.fillStyle = '#111827';
+      ctx.font = `bold 14px ${FONT}`;
+      ctx.fillText(clampText(ctx, line1, maxW), tx, y + 24);
+      ctx.fillStyle = '#6b7280';
+      ctx.font = `12px ${FONT}`;
+      ctx.fillText(line2, tx, y + 40);
+    }
+  }
+
+  function clampText(ctx, text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    while (text.length > 1 && ctx.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+    return text + '…';
+  }
+
+  drawRow(0, `${totalKm}km`, 'Départ', '', true);
+  sorted.forEach(({ poi, distRemaining }, i) => {
+    const meta = POI_META[poi.type] || { label: poi.type, emoji: '📍' };
+    drawRow(
+      i + 1,
+      `${distRemaining}km`,
+      `${meta.emoji}  ${meta.label} · ${poi.name}`,
+      `à ${poi.distance}m de la trace`,
+      false
+    );
+  });
+  drawRow(sorted.length + 1, '0km', 'Arrivée', '', true);
+
+  // Download
+  const dataUrl = canvas.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'roadmap.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function downloadFile(content, filename, type) {

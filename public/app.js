@@ -1175,9 +1175,22 @@ function toggleTypeFilter(type, btn) {
 
 
 // Export functions
-document.getElementById('export-gpx').addEventListener('click', () => exportPOIs('gpx'));
-document.getElementById('export-csv').addEventListener('click', () => exportPOIs('csv'));
-document.getElementById('export-json').addEventListener('click', () => exportPOIs('json'));
+// Export button — toggle popup
+const exportPopup = document.getElementById('export-popup');
+document.getElementById('export-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  exportPopup.classList.toggle('hidden');
+});
+
+exportPopup.addEventListener('click', (e) => {
+  const item = e.target.closest('.export-popup-item');
+  if (!item) return;
+  exportPOIs(item.dataset.format);
+  exportPopup.classList.add('hidden');
+});
+
+// Close popup when clicking outside
+document.addEventListener('click', () => exportPopup.classList.add('hidden'));
 
 function exportPOIs(format) {
   if (!currentData) return;

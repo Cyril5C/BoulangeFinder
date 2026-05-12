@@ -785,6 +785,51 @@ body.offline .map-section {
   color: white;
 }
 
+/* Export popup */
+.export-popup {
+  position: absolute;
+  top: calc(10px + 44px + 6px);
+  right: 10px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  z-index: 1100;
+  overflow: hidden;
+  min-width: 220px;
+}
+
+.export-popup-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.export-popup-item:last-child { border-bottom: none; }
+.export-popup-item:hover { background: #f8f8f8; }
+.export-popup-item:active { background: #f0f0f0; }
+
+.export-popup-icon { font-size: 1.2rem; flex-shrink: 0; }
+
+.export-popup-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #1f2937;
+  min-width: 36px;
+}
+
+.export-popup-desc {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
 /* Add POI mode — map cursor */
 .map-add-mode {
   cursor: crosshair !important;
@@ -879,6 +924,12 @@ body.offline .map-section {
     font-size: 0.8rem;
     flex-shrink: 0;
     min-height: 40px;
+  }
+
+  /* Export popup — below the full-width controls bar */
+  .export-popup {
+    top: calc(57px + env(safe-area-inset-top, 0px) + 6px);
+    right: 8px;
   }
 
   /* POI type filter — scrollable, above bottom safe area */

@@ -117,9 +117,26 @@
       <button id="fav-filter-btn" class="control-btn" title="Afficher seulement les favoris">☆</button>
       <button id="add-poi-btn" class="control-btn" title="Ajouter un POI manuellement">➕</button>
       <button id="cache-offline-btn" class="control-btn" title="Préparer pour hors-ligne">📥</button>
-      <button id="export-gpx" class="control-btn">GPX</button>
-      <button id="export-csv" class="control-btn">CSV</button>
-      <button id="export-json" class="control-btn">JSON</button>
+      <button id="export-btn" class="control-btn" title="Exporter">⬇️</button>
+    </div>
+
+    <!-- Export popup -->
+    <div id="export-popup" class="export-popup hidden">
+      <button class="export-popup-item" data-format="gpx">
+        <span class="export-popup-icon">🗺️</span>
+        <span class="export-popup-label">GPX</span>
+        <span class="export-popup-desc">Waypoints pour GPS / appli vélo</span>
+      </button>
+      <button class="export-popup-item" data-format="csv">
+        <span class="export-popup-icon">📊</span>
+        <span class="export-popup-label">CSV</span>
+        <span class="export-popup-desc">Tableau pour Excel / Sheets</span>
+      </button>
+      <button class="export-popup-item" data-format="json">
+        <span class="export-popup-icon">📄</span>
+        <span class="export-popup-label">JSON</span>
+        <span class="export-popup-desc">Données brutes</span>
+      </button>
     </div>
 
     <!-- Add custom POI modal -->

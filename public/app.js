@@ -1621,8 +1621,7 @@ function generateRoadmapImage() {
   const W = 1179;
   const H = 2556;
   const nRows = sorted.length + 2; // départ + favoris + arrivée
-  const HEADER_H = 280;
-  const ROW_H = Math.floor((H - HEADER_H) / nRows);
+  const ROW_H = Math.floor(H / nRows);
   const PAD = 64;
   const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
 
@@ -1635,20 +1634,6 @@ function generateRoadmapImage() {
   ctx.fillStyle = '#0d1117';
   ctx.fillRect(0, 0, W, H);
 
-  // Header gradient
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, '#667eea');
-  grad.addColorStop(1, '#764ba2');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, HEADER_H);
-  const traceTitle = (currentData.filename || 'Roadmap').replace(/\.gpx$/i, '');
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `bold 88px ${FONT}`;
-  ctx.fillText(clampText(traceTitle, W - PAD * 2, 88), PAD, 110);
-  ctx.font = `48px ${FONT}`;
-  ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.fillText(`${totalKm} km  ·  ${sorted.length} favori${sorted.length > 1 ? 's' : ''}`, PAD, 196);
-
   function clampText(text, maxW, fontSize) {
     ctx.font = `bold ${fontSize}px ${FONT}`;
     if (ctx.measureText(text).width <= maxW) return text;
@@ -1657,7 +1642,7 @@ function generateRoadmapImage() {
   }
 
   function drawRow(idx, kmNum, kmUnit, emoji, nameLine, distLine, special) {
-    const y = HEADER_H + idx * ROW_H;
+    const y = idx * ROW_H;
 
     // Background
     ctx.fillStyle = special ? '#161b27' : (idx % 2 === 0 ? '#0d1117' : '#111827');

@@ -22,6 +22,12 @@
 
       <button id="install-btn" class="install-btn hidden">📲 Installer l'application</button>
 
+      <!-- Server traces list -->
+      <div id="server-traces-section" class="server-cache-section hidden">
+        <p class="server-cache-title">Mes traces</p>
+        <div id="server-traces-list" class="server-cache-list"></div>
+      </div>
+
       <form id="gpx-form" class="upload-form">
         <div class="file-input-wrapper">
           <input type="file" id="gpx-file" name="gpx" accept=".gpx" required>
@@ -38,7 +44,10 @@
         </div>
 
         <div class="poi-selection">
-          <p class="poi-selection-label">Y'a pas que les boulanges dans la vie :</p>
+          <div class="poi-selection-header">
+            <p class="poi-selection-label">Y'a pas que les boulanges dans la vie :</p>
+            <button type="button" id="toggle-all-poi" class="toggle-all-btn">Tout sélectionner</button>
+          </div>
           <div class="poi-checkboxes">
             <label class="poi-checkbox">
               <input type="checkbox" name="poi-bakery" id="poi-bakery" checked>
@@ -93,12 +102,6 @@
       <div id="cached-gpx-section" class="cached-gpx-section hidden">
         <p class="cached-gpx-title">Tes maps</p>
         <div id="cached-gpx-list" class="cached-gpx-list"></div>
-      </div>
-
-      <!-- Server traces list -->
-      <div id="server-traces-section" class="server-cache-section hidden">
-        <p class="server-cache-title">Mes traces</p>
-        <div id="server-traces-list" class="server-cache-list"></div>
       </div>
     </div>
   </div>

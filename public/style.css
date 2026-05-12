@@ -142,11 +142,34 @@ body {
   text-align: left;
 }
 
+.poi-selection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
 .poi-selection-label {
   color: #666;
   font-size: 0.9rem;
-  margin-bottom: 10px;
-  text-align: center;
+  margin: 0;
+}
+
+.toggle-all-btn {
+  background: none;
+  border: 1.5px solid #ddd;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: #555;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.toggle-all-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
 }
 
 .poi-checkboxes {

@@ -969,6 +969,16 @@ geolocBtn.addEventListener('click', () => {
 });
 
 // Back button
+// Select all / deselect all POI types
+const POI_CHECKBOX_IDS = ['poi-bakery','poi-cafe','poi-water','poi-toilets','poi-hotel','poi-camping','poi-restaurant','poi-supermarket'];
+
+document.getElementById('toggle-all-poi').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  const allChecked = POI_CHECKBOX_IDS.every(id => document.getElementById(id).checked);
+  POI_CHECKBOX_IDS.forEach(id => { document.getElementById(id).checked = !allChecked; });
+  btn.textContent = allChecked ? 'Tout sélectionner' : 'Tout désélectionner';
+});
+
 backBtn.addEventListener('click', () => {
   mapSection.classList.add('hidden');
   uploadSection.classList.remove('hidden');

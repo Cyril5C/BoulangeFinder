@@ -668,7 +668,7 @@ gpxForm.addEventListener('submit', async (e) => {
   // Check localStorage cache first
   const cached = loadFromCache(cacheKey);
   if (cached) {
-    currentTraceKey = cacheKey;
+    currentTraceKey = cached.traceId || cacheKey;
     currentData = cached;
     showMap(currentData);
     return;
@@ -710,8 +710,8 @@ gpxForm.addEventListener('submit', async (e) => {
 
     currentData = await response.json();
 
-    // Save to localStorage cache
-    currentTraceKey = cacheKey;
+    // Use stable traceId from server as currentTraceKey
+    currentTraceKey = currentData.traceId || cacheKey;
     saveToCache(cacheKey, currentData);
 
     // Save to IndexedDB for offline use

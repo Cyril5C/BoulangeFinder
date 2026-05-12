@@ -2,12 +2,10 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const BASE_DIR = require('../utils/dataDir');
 
 const router = express.Router();
-
-const DATA_DIR = process.env.NODE_ENV === 'production'
-  ? '/data/traces'
-  : path.join(__dirname, '../../data/traces');
+const DATA_DIR = path.join(BASE_DIR, 'traces');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 

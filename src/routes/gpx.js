@@ -73,8 +73,8 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
       }
     };
 
-    saveTrace(req.file.originalname, result);
-    res.json(result);
+    const traceId = saveTrace(req.file.originalname, result);
+    res.json({ ...result, traceId });
   } catch (error) {
     console.error('Erreur lors du traitement du GPX:', error);
     res.status(500).json({ error: 'Erreur lors du traitement du fichier GPX' });

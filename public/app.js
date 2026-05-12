@@ -1213,8 +1213,8 @@ function exportPOIs(format) {
 
   switch (format) {
     case 'gpx':
-      content = generateGPX(filteredPois);
-      filename = 'pois.gpx';
+      content = generateGPX(currentData.track);
+      filename = 'trace.gpx';
       type = 'application/gpx+xml';
       break;
     case 'csv':
@@ -1296,21 +1296,20 @@ function toRad(deg) {
   return deg * Math.PI / 180;
 }
 
-function generateGPX(pois) {
+function generateGPX(track) {
   let gpx = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="BoulangesFinder">
+  <trk>
+    <trkseg>
 `;
-
-  pois.forEach(poi => {
-    gpx += `  <wpt lat="${poi.lat}" lon="${poi.lon}">
-    <name>${escapeXml(poi.name)}</name>
-    <type>${poi.type}</type>
-    <desc>Distance: ${poi.distance}m</desc>
-  </wpt>
-`;
+  track.forEach(p => {
+    gpx += `      <trkpt lat="${p.lat}" lon="${p.lon}">`;
+    if (p.ele != null) gpx += `<ele>${p.ele}</ele>`;
+    gpx += `</trkpt>\n`;
   });
-
-  gpx += '</gpx>';
+  gpx += `    </trkseg>
+  </trk>
+</gpx>`;
   return gpx;
 }
 

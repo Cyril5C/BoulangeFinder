@@ -1620,7 +1620,7 @@ function generateRoadmapImage() {
   // Taille exacte fond d'écran iPhone 16 : 1179 × 2556 px
   const W = 1179;
   const H = 2556;
-  const nRows = sorted.length + 2; // départ + favoris + arrivée
+  const nRows = sorted.length + 1; // départ + favoris
   const ROW_H = Math.floor(H / nRows);
   const PAD = 64;
   const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
@@ -1729,7 +1729,6 @@ function generateRoadmapImage() {
     );
   });
 
-  drawRow(sorted.length + 1, '0', 'km', '', 'Arrivée', '', true);
 
   // Download
   const dataUrl = canvas.toDataURL('image/png');

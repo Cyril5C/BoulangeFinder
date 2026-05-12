@@ -1736,7 +1736,7 @@ function generateRoadmapImage() {
     drawRow(
       i + 1,
       kmDec ? `${kmInt}.${kmDec}` : kmInt,
-      'km',
+      `${poi.distance}m`,
       meta.emoji,
       poi.name,
       `${meta.label}  ·  à ${poi.distance}m`,

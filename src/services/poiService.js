@@ -278,7 +278,7 @@ function generateBornes(trackPoints, intervalMeters = 10000) {
       lat,
       lon,
       type: 'borne',
-      name: `${remainingKm} km`,
+      name: `${remainingKm}`,
       distance: 0,
       tags: {},
       isOpenNow: null

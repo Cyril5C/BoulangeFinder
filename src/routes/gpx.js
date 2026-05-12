@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { parseGPX } = require('../services/gpxParser');
 const { findPOIsAlongRoute, getCacheStats } = require('../services/poiService');
+const { saveTrace } = require('./traces');
 
 const router = express.Router();
 
@@ -58,7 +59,7 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
       hotel: pois.filter(p => p.type === 'hotel').length
     });
 
-    res.json({
+    const result = {
       track: trackPoints,
       pois: pois,
       stats: {
@@ -70,7 +71,10 @@ router.post('/upload', upload.single('gpx'), async (req, res) => {
         toilets: pois.filter(p => p.type === 'toilets').length,
         hotels: pois.filter(p => p.type === 'hotel').length
       }
-    });
+    };
+
+    saveTrace(req.file.originalname, result);
+    res.json(result);
   } catch (error) {
     console.error('Erreur lors du traitement du GPX:', error);
     res.status(500).json({ error: 'Erreur lors du traitement du fichier GPX' });

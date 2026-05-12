@@ -20,6 +20,8 @@
       <h1>Boulanges Finder</h1>
       <p>Trouve boulanges, cafés et tout plein de choses intéressantes pour planifier ton parcours</p>
 
+      <button id="install-btn" class="install-btn hidden">📲 Installer l'application</button>
+
       <form id="gpx-form" class="upload-form">
         <div class="file-input-wrapper">
           <input type="file" id="gpx-file" name="gpx" accept=".gpx" required>
@@ -93,10 +95,10 @@
         <div id="cached-gpx-list" class="cached-gpx-list"></div>
       </div>
 
-      <!-- Server cache list -->
-      <div id="server-cache-section" class="server-cache-section hidden">
-        <p class="server-cache-title">Les maps de la communauté</p>
-        <div id="server-cache-list" class="server-cache-list"></div>
+      <!-- Server traces list -->
+      <div id="server-traces-section" class="server-cache-section hidden">
+        <p class="server-cache-title">Mes traces</p>
+        <div id="server-traces-list" class="server-cache-list"></div>
       </div>
     </div>
   </div>
@@ -109,6 +111,9 @@
     <div class="controls-panel" id="controls-panel">
       <button id="back-btn" class="control-btn">←</button>
       <button id="share-btn" class="control-btn" title="Partager">🔗</button>
+      <button id="fav-filter-btn" class="control-btn" title="Afficher seulement les favoris">☆</button>
+      <button id="add-poi-btn" class="control-btn" title="Ajouter un POI manuellement">➕</button>
+      <button id="cache-offline-btn" class="control-btn" title="Préparer pour hors-ligne">📥</button>
       <select id="day-filter" class="control-btn day-select" title="Filtrer par jour d'ouverture">
         <option value="">Tous</option>
         <option value="now">Ouvert maintenant</option>
@@ -124,6 +129,33 @@
       <button id="export-csv" class="control-btn">CSV</button>
       <button id="export-json" class="control-btn">JSON</button>
     </div>
+
+    <!-- Add custom POI modal -->
+    <div id="add-poi-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Ajouter un POI</h3>
+        <input type="text" id="custom-poi-name" placeholder="Nom du lieu" autocomplete="off">
+        <select id="custom-poi-type">
+          <option value="custom">📌 Personnalisé</option>
+          <option value="bakery">🥖 Boulangerie</option>
+          <option value="cafe">☕ Café</option>
+          <option value="water">💧 Point d'eau</option>
+          <option value="toilets">🚻 Toilettes</option>
+          <option value="hotel">🏨 Hébergement</option>
+          <option value="camping">⛺ Camping</option>
+          <option value="restaurant">🍽️ Restaurant</option>
+          <option value="supermarket">🛒 Supermarché</option>
+        </select>
+        <textarea id="custom-poi-notes" placeholder="Notes (optionnel)" rows="2"></textarea>
+        <div class="modal-actions">
+          <button id="cancel-add-poi" class="modal-btn modal-btn-cancel">Annuler</button>
+          <button id="confirm-add-poi" class="modal-btn modal-btn-confirm">Ajouter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POI Type Filter -->
+    <div id="poi-type-filter" class="poi-type-filter hidden"></div>
 
     <!-- Geolocation Button -->
     <button id="geoloc-btn" class="geoloc-btn" title="Ma position">📍</button>

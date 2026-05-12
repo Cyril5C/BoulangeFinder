@@ -5,6 +5,9 @@ const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const gpxRoutes = require('./routes/gpx');
 const shareRoutes = require('./routes/share');
+const favoritesRoutes = require('./routes/favorites');
+const customPoisRoutes = require('./routes/customPois');
+const tracesRoutes = require('./routes/traces');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -100,6 +103,9 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Routes
 app.use('/api/gpx', gpxRoutes);
+app.use('/api/favorites', favoritesRoutes);
+app.use('/api/custom-pois', customPoisRoutes);
+app.use('/api/traces', tracesRoutes);
 
 // Serve index.html for root
 app.get('/', (req, res) => {

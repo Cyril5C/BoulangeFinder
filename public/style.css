@@ -44,6 +44,24 @@ body {
   font-size: 0.9rem;
 }
 
+.install-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.install-btn:hover { opacity: 0.9; }
+.install-btn:active { transform: scale(0.98); }
+
 .upload-form {
   display: flex;
   flex-direction: column;
@@ -395,6 +413,59 @@ body {
   outline-offset: 1px;
 }
 
+/* POI type filter panel */
+.poi-type-filter {
+  position: absolute;
+  bottom: 30px;
+  left: 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  z-index: 1000;
+  max-width: calc(100vw - 70px);
+}
+
+.poi-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: opacity 0.2s, transform 0.1s;
+  color: white;
+}
+
+.poi-filter-btn:active {
+  transform: scale(0.95);
+}
+
+.poi-filter-btn.inactive {
+  opacity: 0.35;
+  filter: grayscale(60%);
+}
+
+.poi-filter-btn .filter-count {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  padding: 0 5px;
+  font-size: 0.72rem;
+}
+
+.poi-filter-btn.bakery     { background: #f59e0b; }
+.poi-filter-btn.cafe       { background: #8b5cf6; }
+.poi-filter-btn.water      { background: #3b82f6; }
+.poi-filter-btn.toilets    { background: #10b981; }
+.poi-filter-btn.hotel      { background: #ec4899; }
+.poi-filter-btn.camping    { background: #16a34a; }
+.poi-filter-btn.restaurant { background: #ef4444; }
+.poi-filter-btn.supermarket{ background: #0ea5e9; }
+
 /* Geolocation button */
 .geoloc-btn {
   position: absolute;
@@ -565,6 +636,142 @@ body.offline .map-section {
 .poi-type.supermarket {
   background: #0ea5e9;
 }
+
+/* Favorite button in popup */
+.fav-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #555;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.fav-btn:hover {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.fav-btn.active {
+  border-color: #fbbf24;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.delete-custom-poi {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px;
+  border: 1.5px solid #fee2e2;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #dc2626;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.delete-custom-poi:hover {
+  background: #fee2e2;
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 14px;
+  padding: 20px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-content h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.modal-content input:focus,
+.modal-content select:focus,
+.modal-content textarea:focus {
+  border-color: #667eea;
+}
+
+.modal-content textarea {
+  resize: none;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.modal-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.modal-btn:active { transform: scale(0.97); }
+
+.modal-btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.modal-btn-confirm {
+  background: #667eea;
+  color: white;
+}
+
+/* Add POI mode — map cursor */
+.map-add-mode {
+  cursor: crosshair !important;
+}
+
 
 .poi-nav-links {
   display: flex;

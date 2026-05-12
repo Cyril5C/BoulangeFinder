@@ -18,6 +18,195 @@ let distanceMarkers = [];
 let isOffline = !navigator.onLine;
 let filterDay = ''; // '', 'now', 'Mo', 'Tu', etc.
 let allPoiMarkers = [];
+let activePoiTypeFilters = new Set();
+let favoritePois = new Set();
+let showOnlyFavorites = false;
+let markerByPoiId = new Map();
+let customPois = [];
+let currentTraceKey = null;
+let addPoiMode = false;
+let pendingCustomPoiLatLon = null;
+
+// ── Favorites ───────────────────────────────────────────────────────────────
+
+async function loadFavorites() {
+  try {
+    const res = await fetch('/api/favorites', { credentials: 'same-origin' });
+    if (res.ok) {
+      favoritePois = new Set(await res.json());
+    }
+  } catch (e) {
+    // Offline fallback: use localStorage mirror
+    try {
+      const stored = localStorage.getItem('boulange_favorites_cache');
+      favoritePois = new Set(stored ? JSON.parse(stored) : []);
+    } catch (_) { favoritePois = new Set(); }
+  }
+}
+
+async function toggleFavorite(poiId) {
+  const id = String(poiId);
+  try {
+    const res = await fetch('/api/favorites/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id })
+    });
+    if (res.ok) {
+      favoritePois = new Set(await res.json());
+      localStorage.setItem('boulange_favorites_cache', JSON.stringify([...favoritePois]));
+    }
+  } catch (e) {
+    // Offline: toggle locally
+    if (favoritePois.has(id)) { favoritePois.delete(id); } else { favoritePois.add(id); }
+    localStorage.setItem('boulange_favorites_cache', JSON.stringify([...favoritePois]));
+  }
+
+  const entry = markerByPoiId.get(id);
+  if (entry) {
+    const { marker, poi } = entry;
+    const isFav = favoritePois.has(id);
+    marker.setIcon(isFav ? createFavoriteIcon(poi.type) : (icons[poi.type] || icons.custom));
+    marker.setPopupContent(createPopupContent(poi));
+  }
+
+  if (showOnlyFavorites) applyFavoritesFilter();
+}
+
+function applyFavoritesFilter() {
+  allPoiMarkers.forEach(({ marker, poi, type }) => {
+    if (type === 'borne') return;
+    const layer = poiLayers[type];
+    if (!layer) return;
+    const isFav = favoritePois.has(String(poi.id));
+    const visible = !showOnlyFavorites || isFav;
+    if (visible) {
+      if (!layer.hasLayer(marker)) layer.addLayer(marker);
+      // Ensure the layer group itself is on the map
+      if (!map.hasLayer(layer)) layer.addTo(map);
+    } else {
+      layer.removeLayer(marker);
+    }
+  });
+}
+
+// ── Custom POIs ─────────────────────────────────────────────────────────────
+
+async function loadCustomPois(traceKey) {
+  try {
+    const res = await fetch(`/api/custom-pois?traceKey=${encodeURIComponent(traceKey)}`, { credentials: 'same-origin' });
+    customPois = res.ok ? await res.json() : [];
+  } catch (e) {
+    customPois = [];
+  }
+}
+
+async function addCustomPoi(lat, lon, name, type, notes) {
+  const poi = {
+    id: `custom_${Date.now()}`,
+    lat, lon,
+    type: type || 'custom',
+    name: name || 'POI personnalisé',
+    notes: notes || '',
+    distance: 0,
+    tags: {},
+    isCustom: true
+  };
+  try {
+    const res = await fetch('/api/custom-pois', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ traceKey: currentTraceKey, poi })
+    });
+    if (res.ok) customPois = await res.json();
+    else customPois.push(poi);
+  } catch (e) {
+    customPois.push(poi);
+  }
+  placePoiMarker(poi);
+  buildTypeFilterPanel({ pois: allPoiMarkers.map(e => e.poi) });
+  return poi;
+}
+
+async function deleteCustomPoi(poiId) {
+  try {
+    await fetch(`/api/custom-pois/${encodeURIComponent(poiId)}?traceKey=${encodeURIComponent(currentTraceKey)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin'
+    });
+  } catch (e) { /* offline — remove locally anyway */ }
+
+  customPois = customPois.filter(p => p.id !== poiId);
+  const entry = markerByPoiId.get(String(poiId));
+  if (entry) {
+    const { marker, type } = entry;
+    if (poiLayers[type]) poiLayers[type].removeLayer(marker);
+    allPoiMarkers = allPoiMarkers.filter(e => e.poi.id !== poiId);
+    markerByPoiId.delete(String(poiId));
+  }
+}
+
+// ── Offline tile caching ─────────────────────────────────────────────────────
+
+function latLonToTileXY(lat, lon, z) {
+  const x = Math.floor((lon + 180) / 360 * (1 << z));
+  const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * (1 << z));
+  return [x, y];
+}
+
+function getTrackTileUrls(track, z) {
+  const seen = new Set();
+  const urls = [];
+  const subdomains = ['a', 'b', 'c'];
+  let si = 0;
+  track.forEach(({ lat, lon }) => {
+    const [x, y] = latLonToTileXY(lat, lon, z);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const key = `${x + dx}/${y + dy}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          urls.push(`https://${subdomains[si % 3]}.tile.openstreetmap.org/${z}/${key}.png`);
+          si++;
+        }
+      }
+    }
+  });
+  return urls;
+}
+
+async function cacheTrackTiles(track) {
+  const btn = document.getElementById('cache-offline-btn');
+  if (!navigator.onLine) { if (btn) btn.textContent = '📵'; return; }
+
+  const urls = getTrackTileUrls(track, 13);
+  btn.disabled = true;
+  let n = 0;
+  for (const url of urls) {
+    try { await fetch(url, { mode: 'no-cors' }); } catch (e) {}
+    n++;
+    if (n % 5 === 0) {
+      btn.textContent = `📥 ${Math.round(n / urls.length * 100)}%`;
+      await new Promise(r => setTimeout(r, 30));
+    }
+  }
+  btn.textContent = '✅';
+  btn.title = `${urls.length} tuiles mises en cache`;
+}
+
+const POI_META = {
+  bakery:      { label: 'Boulanges',    emoji: '🥖' },
+  cafe:        { label: 'Cafés',        emoji: '☕' },
+  water:       { label: "Points d'eau", emoji: '💧' },
+  toilets:     { label: 'Toilettes',    emoji: '🚻' },
+  hotel:       { label: 'Hôtels',       emoji: '🏨' },
+  camping:     { label: 'Campings',     emoji: '⛺' },
+  restaurant:  { label: 'Restaurants',  emoji: '🍽️' },
+  supermarket: { label: 'Supermarchés', emoji: '🛒' },
+  custom:      { label: 'Perso',        emoji: '📌' },
+};
 
 // DOM Elements
 const uploadSection = document.getElementById('upload-section');
@@ -38,8 +227,31 @@ const icons = {
   hotel: createIcon('#ec4899', '🏨'),
   camping: createIcon('#16a34a', '⛺'),
   restaurant: createIcon('#ef4444', '🍽️'),
-  supermarket: createIcon('#0ea5e9', '🛒')
+  supermarket: createIcon('#0ea5e9', '🛒'),
+  custom: createIcon('#7c3aed', '📌')
 };
+
+const POI_COLORS = {
+  bakery: '#f59e0b', cafe: '#8b5cf6', water: '#3b82f6',
+  toilets: '#10b981', hotel: '#ec4899', camping: '#16a34a',
+  restaurant: '#ef4444', supermarket: '#0ea5e9', custom: '#7c3aed'
+};
+const POI_EMOJIS = {
+  bakery: '🥖', cafe: '☕', water: '💧', toilets: '🚻',
+  hotel: '🏨', camping: '⛺', restaurant: '🍽️', supermarket: '🛒', custom: '📌'
+};
+
+function createFavoriteIcon(type) {
+  const color = POI_COLORS[type] || '#667eea';
+  const emoji = POI_EMOJIS[type] || '📍';
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="background:white;border:3px solid ${color};border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 0 0 2.5px #fbbf24;position:relative;">${emoji}<span style="position:absolute;top:-7px;right:-7px;font-size:11px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.3));">⭐</span></div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15]
+  });
+}
 
 function createBorneIcon(name) {
   return L.divIcon({
@@ -76,6 +288,29 @@ if ('serviceWorker' in navigator) {
     .then(() => console.log('Service Worker registered'))
     .catch(err => console.log('SW registration failed:', err));
 }
+
+// PWA install prompt
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('install-btn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBtn.classList.remove('hidden');
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  if (outcome === 'accepted') installBtn.classList.add('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  installBtn.classList.add('hidden');
+  deferredInstallPrompt = null;
+});
 
 // Check for shared map URL
 async function checkSharedMap() {
@@ -336,58 +571,57 @@ function getTimeAgo(timestamp) {
   return `il y a ${Math.floor(seconds / 86400)}j`;
 }
 
-// Fetch and display server-side cache
-async function displayServerCache() {
-  const section = document.getElementById('server-cache-section');
-  const listContainer = document.getElementById('server-cache-list');
-
+// Fetch and display server-saved traces
+async function displayServerTracesList() {
+  const section = document.getElementById('server-traces-section');
+  const listContainer = document.getElementById('server-traces-list');
   if (!section || !listContainer) return;
 
   try {
-    const response = await fetch('/api/gpx/cache');
-    if (!response.ok) {
-      section.classList.add('hidden');
-      return;
-    }
+    const res = await fetch('/api/traces', { credentials: 'same-origin' });
+    if (!res.ok) { section.classList.add('hidden'); return; }
 
-    const stats = await response.json();
-
-    if (stats.entries.length === 0) {
-      section.classList.add('hidden');
-      return;
-    }
+    const traces = await res.json();
+    if (traces.length === 0) { section.classList.add('hidden'); return; }
 
     section.classList.remove('hidden');
     listContainer.innerHTML = '';
 
-    // Sort by most recent first
-    stats.entries.sort((a, b) => b.timestamp - a.timestamp);
-
-    stats.entries.forEach(entry => {
+    traces.forEach(trace => {
       const div = document.createElement('div');
-      div.className = 'server-cache-item';
-
-      const timeAgo = getTimeAgo(entry.timestamp);
-      const ttlMin = Math.round(entry.remainingTtlMs / 60000);
-      const bboxStr = `${entry.bbox.south.toFixed(2)},${entry.bbox.west.toFixed(2)} - ${entry.bbox.north.toFixed(2)},${entry.bbox.east.toFixed(2)}`;
-      const poiTypesStr = entry.poiTypes.join(', ');
-
+      div.className = 'cached-gpx-item';
       div.innerHTML = `
-        <div class="server-cache-info">
-          <span class="server-cache-name">${entry.poiCount} POIs (${poiTypesStr})</span>
-          <span class="server-cache-meta">Zone: ${bboxStr}</span>
-          <span class="server-cache-meta">${timeAgo} - expire dans ${ttlMin}min</span>
+        <div class="cached-gpx-info">
+          <span class="cached-gpx-name">${escapeHtml(trace.name)}</span>
+          <span class="cached-gpx-meta">${trace.poiCount} POIs · ${getTimeAgo(trace.savedAt)}</span>
+        </div>
+        <div class="cached-gpx-actions">
+          <button class="cached-gpx-load" title="Charger">📂</button>
+          <button class="cached-gpx-delete" title="Supprimer">🗑️</button>
         </div>
       `;
 
+      div.querySelector('.cached-gpx-load').addEventListener('click', async () => {
+        try {
+          const r = await fetch(`/api/traces/${trace.id}`, { credentials: 'same-origin' });
+          if (!r.ok) { alert('Trace introuvable sur le serveur'); return; }
+          currentData = await r.json();
+          currentTraceKey = trace.id;
+          showMap(currentData);
+        } catch (e) {
+          alert('Erreur lors du chargement de la trace');
+        }
+      });
+
+      div.querySelector('.cached-gpx-delete').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Supprimer "${trace.name}" ?`)) return;
+        await fetch(`/api/traces/${trace.id}`, { method: 'DELETE', credentials: 'same-origin' });
+        displayServerTracesList();
+      });
+
       listContainer.appendChild(div);
     });
-
-    // Update header with cache stats
-    const title = section.querySelector('.server-cache-title');
-    if (title) {
-      title.textContent = `Les maps de la communauté (${stats.size}/${stats.maxSize})`;
-    }
   } catch (e) {
     section.classList.add('hidden');
   }
@@ -395,7 +629,7 @@ async function displayServerCache() {
 
 // Display cached list on page load
 displayCachedGpxList();
-displayServerCache();
+displayServerTracesList();
 
 // File input display
 gpxFileInput.addEventListener('change', (e) => {
@@ -434,6 +668,7 @@ gpxForm.addEventListener('submit', async (e) => {
   // Check localStorage cache first
   const cached = loadFromCache(cacheKey);
   if (cached) {
+    currentTraceKey = cacheKey;
     currentData = cached;
     showMap(currentData);
     return;
@@ -476,6 +711,7 @@ gpxForm.addEventListener('submit', async (e) => {
     currentData = await response.json();
 
     // Save to localStorage cache
+    currentTraceKey = cacheKey;
     saveToCache(cacheKey, currentData);
 
     // Save to IndexedDB for offline use
@@ -513,7 +749,7 @@ function setLoading(loading) {
   submitBtn.querySelector('.btn-loader').classList.toggle('hidden', !loading);
 }
 
-function showMap(data) {
+async function showMap(data) {
   uploadSection.classList.add('hidden');
   mapSection.classList.remove('hidden');
 
@@ -540,42 +776,71 @@ function showMap(data) {
     opacity: 0.8
   }).addTo(map);
 
-  // Add distance markers every 20km
   // Create POI layers
-  poiLayers.bakery = L.layerGroup();
-  poiLayers.cafe = L.layerGroup();
-  poiLayers.water = L.layerGroup();
-  poiLayers.toilets = L.layerGroup();
-  poiLayers.hotel = L.layerGroup();
-  poiLayers.camping = L.layerGroup();
-  poiLayers.restaurant = L.layerGroup();
-  poiLayers.supermarket = L.layerGroup();
-  poiLayers.borne = L.layerGroup();
-  allPoiMarkers = [];
-
-  data.pois.forEach(poi => {
-    // Skip unknown POI types
-    if (!poiLayers[poi.type]) return;
-
-    const icon = poi.type === 'borne' ? createBorneIcon(poi.name) : icons[poi.type];
-    const marker = L.marker([poi.lat, poi.lon], { icon });
-
-    marker.bindPopup(createPopupContent(poi));
-    marker.poiData = poi; // Store POI data for filtering
-    allPoiMarkers.push({ marker, poi, type: poi.type });
-    poiLayers[poi.type].addLayer(marker);
+  ['bakery','cafe','water','toilets','hotel','camping','restaurant','supermarket','borne','custom'].forEach(t => {
+    poiLayers[t] = L.layerGroup();
   });
+  allPoiMarkers = [];
+  markerByPoiId = new Map();
+
+  // Load state for this trace
+  await loadFavorites();
+  if (currentTraceKey) await loadCustomPois(currentTraceKey);
+
+  // Place OSM POIs
+  data.pois.forEach(poi => placePoiMarker(poi));
+
+  // Place custom POIs
+  customPois.forEach(poi => placePoiMarker(poi));
 
   // Add layers to map
   Object.values(poiLayers).forEach(layer => layer.addTo(map));
 
-  // Apply filter if active
-  if (filterDay) {
-    applyDayFilter();
-  }
+  // Restore filters
+  buildTypeFilterPanel({ pois: allPoiMarkers.map(e => e.poi) });
+  if (showOnlyFavorites) applyFavoritesFilter();
+  if (filterDay) applyDayFilter();
 
   // Fit bounds
   map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
+
+  // Map click for add-POI mode (register once)
+  if (!map._addPoiListenerRegistered) {
+    map.on('click', (e) => {
+      if (!addPoiMode) return;
+      pendingCustomPoiLatLon = { lat: e.latlng.lat, lon: e.latlng.lng };
+      document.getElementById('custom-poi-name').value = '';
+      document.getElementById('custom-poi-notes').value = '';
+      document.getElementById('custom-poi-type').value = 'custom';
+      document.getElementById('add-poi-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('custom-poi-name').focus(), 50);
+    });
+    map._addPoiListenerRegistered = true;
+  }
+
+  // Reset cache button
+  const cacheBtn = document.getElementById('cache-offline-btn');
+  if (cacheBtn) { cacheBtn.textContent = '📥'; cacheBtn.disabled = false; }
+}
+
+function placePoiMarker(poi) {
+  if (!poiLayers[poi.type]) return;
+
+  const isFav = favoritePois.has(String(poi.id));
+  let icon;
+  if (poi.type === 'borne') {
+    icon = createBorneIcon(poi.name);
+  } else {
+    icon = isFav ? createFavoriteIcon(poi.type) : (icons[poi.type] || icons.custom);
+  }
+
+  const marker = L.marker([poi.lat, poi.lon], { icon });
+  marker.bindPopup(createPopupContent(poi));
+  marker.poiData = poi;
+
+  allPoiMarkers.push({ marker, poi, type: poi.type });
+  markerByPoiId.set(String(poi.id), { marker, poi, type: poi.type });
+  poiLayers[poi.type].addLayer(marker);
 }
 
 function createPopupContent(poi) {
@@ -616,15 +881,41 @@ function createPopupContent(poi) {
     html += `<p>🌐 <a href="${escapeHtml(website)}" target="_blank" rel="noopener">Site web</a></p>`;
   }
 
-  html += `<div class="poi-nav-links">
-    <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'google', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Google Maps</a>
-    <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'apple', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Apple Plans</a>
-    <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'comaps', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Comaps</a>
-  </div>`;
+  if (poi.type !== 'borne') {
+    const isFav = favoritePois.has(String(poi.id));
+    html += `<button class="fav-btn ${isFav ? 'active' : ''}" data-poi-id="${escapeHtml(String(poi.id))}">
+      ${isFav ? '⭐ Dans les favoris' : '☆ Ajouter aux favoris'}
+    </button>`;
+  }
+
+  if (poi.notes) {
+    html += `<p>📝 ${escapeHtml(poi.notes)}</p>`;
+  }
+
+  if (poi.type !== 'borne') {
+    html += `<div class="poi-nav-links">
+      <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'google', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Google Maps</a>
+      <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'apple', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Apple Plans</a>
+      <a href="#" onclick="navigateTo(${poi.lat}, ${poi.lon}, 'comaps', '${encodeURIComponent(poi.name)}'); return false;" class="nav-link">Comaps</a>
+    </div>`;
+  }
+
+  if (poi.isCustom) {
+    html += `<button class="delete-custom-poi" data-poi-id="${escapeHtml(String(poi.id))}">🗑️ Supprimer ce POI</button>`;
+  }
 
   html += '</div>';
   return html;
 }
+
+// Event delegation for popup buttons (fav + delete)
+document.getElementById('map').addEventListener('click', (e) => {
+  const favBtn = e.target.closest('.fav-btn');
+  if (favBtn) { toggleFavorite(favBtn.dataset.poiId); return; }
+
+  const delBtn = e.target.closest('.delete-custom-poi');
+  if (delBtn) { deleteCustomPoi(delBtn.dataset.poiId); return; }
+});
 
 function escapeHtml(str) {
   const div = document.createElement('div');
@@ -678,7 +969,7 @@ function openNavApp(startLat, startLon, destLat, destLon, app, name) {
   window.open(url, '_blank');
 }
 
-// Geolocation button
+// Geolocation button — one-shot position
 geolocBtn.addEventListener('click', () => {
   if (!navigator.geolocation) {
     alert('Géolocalisation non supportée');
@@ -689,35 +980,29 @@ geolocBtn.addEventListener('click', () => {
 
   navigator.geolocation.getCurrentPosition(
     (position) => {
+      geolocBtn.classList.remove('loading');
       const { latitude, longitude } = position.coords;
 
-      // Remove existing marker
       if (userLocationMarker) {
-        map.removeLayer(userLocationMarker);
+        userLocationMarker.setLatLng([latitude, longitude]);
+      } else {
+        userLocationMarker = L.circleMarker([latitude, longitude], {
+          radius: 10,
+          fillColor: '#667eea',
+          color: '#fff',
+          weight: 3,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).addTo(map);
       }
 
-      // Add user location marker
-      userLocationMarker = L.circleMarker([latitude, longitude], {
-        radius: 10,
-        fillColor: '#667eea',
-        color: '#fff',
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.8
-      }).addTo(map);
-
-      userLocationMarker.bindPopup('Ma position').openPopup();
-
-      // Center map on user location
       map.setView([latitude, longitude], 15);
-
-      geolocBtn.classList.remove('loading');
     },
-    (error) => {
+    () => {
       geolocBtn.classList.remove('loading');
       alert('Impossible d\'obtenir votre position');
     },
-    { timeout: 10000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 });
 
@@ -743,8 +1028,9 @@ backBtn.addEventListener('click', () => {
     userLocationMarker = null;
   }
 
-  // Refresh cached GPX list
+  // Refresh cached GPX lists
   displayCachedGpxList();
+  displayServerTracesList();
 });
 
 // Share function
@@ -791,11 +1077,130 @@ document.getElementById('share-btn').addEventListener('click', async () => {
   }
 });
 
+// Favorites filter
+document.getElementById('fav-filter-btn').addEventListener('click', () => {
+  showOnlyFavorites = !showOnlyFavorites;
+  const btn = document.getElementById('fav-filter-btn');
+  btn.textContent = showOnlyFavorites ? '⭐' : '☆';
+  btn.classList.toggle('active', showOnlyFavorites);
+  if (showOnlyFavorites) {
+    applyFavoritesFilter();
+  } else {
+    // Restore all markers (re-apply type + day filters)
+    allPoiMarkers.forEach(({ marker, poi, type }) => {
+      if (type === 'borne') return;
+      const layer = poiLayers[type];
+      if (layer && !layer.hasLayer(marker)) layer.addLayer(marker);
+    });
+    if (filterDay) applyDayFilter();
+    // Re-apply type filters
+    Object.keys(poiLayers).forEach(type => {
+      if (type === 'borne') return;
+      if (!activePoiTypeFilters.has(type) && poiLayers[type] && map.hasLayer(poiLayers[type])) {
+        map.removeLayer(poiLayers[type]);
+      }
+    });
+  }
+});
+
+// Add POI button
+const addPoiBtn = document.getElementById('add-poi-btn');
+addPoiBtn.addEventListener('click', () => {
+  addPoiMode = !addPoiMode;
+  addPoiBtn.classList.toggle('active', addPoiMode);
+  map.getContainer().classList.toggle('map-add-mode', addPoiMode);
+});
+
+// Cache offline button
+document.getElementById('cache-offline-btn').addEventListener('click', () => {
+  if (currentData?.track) cacheTrackTiles(currentData.track);
+});
+
+// Custom POI modal
+document.getElementById('cancel-add-poi').addEventListener('click', () => {
+  document.getElementById('add-poi-modal').classList.add('hidden');
+  pendingCustomPoiLatLon = null;
+});
+
+document.getElementById('confirm-add-poi').addEventListener('click', async () => {
+  if (!pendingCustomPoiLatLon) return;
+  const name = document.getElementById('custom-poi-name').value.trim() || 'POI personnalisé';
+  const type = document.getElementById('custom-poi-type').value;
+  const notes = document.getElementById('custom-poi-notes').value.trim();
+  await addCustomPoi(pendingCustomPoiLatLon.lat, pendingCustomPoiLatLon.lon, name, type, notes);
+  document.getElementById('add-poi-modal').classList.add('hidden');
+  pendingCustomPoiLatLon = null;
+  addPoiMode = false;
+  addPoiBtn.classList.remove('active');
+  map.getContainer().classList.remove('map-add-mode');
+});
+
+document.getElementById('add-poi-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('add-poi-modal')) {
+    document.getElementById('add-poi-modal').classList.add('hidden');
+    pendingCustomPoiLatLon = null;
+  }
+});
+
+// Map click → add custom POI
+// (initialized after map is created in showMap)
+
 // Day filter change
 document.getElementById('day-filter').addEventListener('change', (e) => {
   filterDay = e.target.value;
   applyDayFilter();
 });
+
+function buildTypeFilterPanel(data) {
+  const panel = document.getElementById('poi-type-filter');
+  panel.innerHTML = '';
+
+  const typeCounts = {};
+  data.pois.forEach(poi => {
+    if (poi.type === 'borne') return;
+    typeCounts[poi.type] = (typeCounts[poi.type] || 0) + 1;
+  });
+
+  const types = Object.keys(typeCounts);
+  if (types.length === 0) {
+    panel.classList.add('hidden');
+    return;
+  }
+
+  activePoiTypeFilters = new Set(types);
+
+  types.forEach(type => {
+    const meta = POI_META[type];
+    if (!meta) return;
+    const btn = document.createElement('button');
+    btn.className = `poi-filter-btn ${type} active`;
+    btn.dataset.type = type;
+    btn.innerHTML = `${meta.emoji} ${meta.label} <span class="filter-count">${typeCounts[type]}</span>`;
+    btn.addEventListener('click', () => toggleTypeFilter(type, btn));
+    panel.appendChild(btn);
+  });
+
+  panel.classList.remove('hidden');
+}
+
+function toggleTypeFilter(type, btn) {
+  if (activePoiTypeFilters.has(type)) {
+    activePoiTypeFilters.delete(type);
+    btn.classList.remove('active');
+    btn.classList.add('inactive');
+    if (poiLayers[type] && map.hasLayer(poiLayers[type])) {
+      map.removeLayer(poiLayers[type]);
+    }
+  } else {
+    activePoiTypeFilters.add(type);
+    btn.classList.remove('inactive');
+    btn.classList.add('active');
+    if (poiLayers[type] && !map.hasLayer(poiLayers[type])) {
+      poiLayers[type].addTo(map);
+      if (filterDay) applyDayFilter();
+    }
+  }
+}
 
 function applyDayFilter() {
   allPoiMarkers.forEach(({ marker, poi, type }) => {

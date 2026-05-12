@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boulanges-finder-v13';
+const CACHE_NAME = 'boulanges-finder-v14';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -6,7 +6,9 @@ const STATIC_ASSETS = [
   '/style.css',
   '/login.html',
   '/manifest.json',
-  '/icons/icon.svg'
+  '/icons/icon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
 const EXTERNAL_ASSETS = [

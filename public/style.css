@@ -916,13 +916,13 @@ body.offline .map-section {
     display: none;
   }
 
-  /* Leaflet popup — constrain width */
+  /* Leaflet popup — full usable width on mobile */
   .leaflet-popup-content-wrapper {
-    max-width: min(85vw, 300px) !important;
+    width: min(92vw, 340px) !important;
   }
 
   .leaflet-popup-content {
-    margin: 10px !important;
+    margin: 12px !important;
     width: auto !important;
   }
 

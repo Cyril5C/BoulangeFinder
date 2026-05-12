@@ -3,7 +3,14 @@ const fs = require('fs');
 const path = require('path');
 
 const router = express.Router();
-const CUSTOM_POIS_FILE = path.join(__dirname, '../../data/custom_pois.json');
+
+const DATA_DIR = process.env.NODE_ENV === 'production'
+  ? '/data'
+  : path.join(__dirname, '../../data');
+
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const CUSTOM_POIS_FILE = path.join(DATA_DIR, 'custom_pois.json');
 
 function readAll() {
   try {

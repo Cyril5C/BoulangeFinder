@@ -1276,7 +1276,7 @@ function getBearing(lat1, lon1, lat2, lon2) {
 function addTrackArrows(track) {
   const intervalKm = 5;
   let cumDist = 0;
-  let nextArrowKm = intervalKm;
+  let nextArrowKm = intervalKm / 2; // offset de 2.5km pour ne jamais coïncider avec les bornes (0, 20, 40…)
 
   for (let i = 1; i < track.length; i++) {
     const segDist = haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon) / 1000;

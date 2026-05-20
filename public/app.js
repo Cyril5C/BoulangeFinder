@@ -15,6 +15,7 @@ let currentData = null;
 let selectedPoiTypes = [];
 let userLocationMarker = null;
 let distanceMarkers = [];
+let showKmMarkers = false;
 let isOffline = !navigator.onLine;
 let allPoiMarkers = [];
 let activePoiTypeFilters = new Set();
@@ -768,9 +769,10 @@ async function showMap(data) {
   buildTypeFilterPanel({ pois: allPoiMarkers.map(e => e.poi) });
   if (showOnlyFavorites) applyFavoritesFilter();
 
-  // Distance markers + direction arrows
-  addDistanceMarkers(data.track);
+  // Direction arrows (toujours affichées)
   addTrackArrows(data.track);
+  // Bornes kilométriques (masquées par défaut)
+  if (showKmMarkers) addDistanceMarkers(data.track);
 
   // Fit bounds
   map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
@@ -1057,6 +1059,14 @@ addPoiBtn.addEventListener('click', () => {
 });
 
 // Cache offline button
+document.getElementById('km-markers-btn').addEventListener('click', () => {
+  showKmMarkers = !showKmMarkers;
+  document.getElementById('km-markers-btn').classList.toggle('active', showKmMarkers);
+  distanceMarkers.forEach(m => map.removeLayer(m));
+  distanceMarkers = [];
+  if (showKmMarkers && currentData?.track) addDistanceMarkers(currentData.track);
+});
+
 document.getElementById('cache-offline-btn').addEventListener('click', () => {
   if (currentData?.track) cacheTrackTiles(currentData.track);
 });

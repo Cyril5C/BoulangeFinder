@@ -915,19 +915,6 @@ body.offline .map-section {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.track-arrow {
-  background: transparent;
-}
-
-.track-arrow-inner {
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 10px solid rgba(26, 58, 107, 0.75);
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
-}
-
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
 

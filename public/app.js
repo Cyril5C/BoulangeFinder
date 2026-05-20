@@ -770,7 +770,6 @@ async function showMap(data) {
   if (showOnlyFavorites) applyFavoritesFilter();
 
   // Direction arrows (toujours affichées)
-  addTrackArrows(data.track);
   // Bornes kilométriques (masquées par défaut)
   if (showKmMarkers) addDistanceMarkers(data.track);
 
@@ -1229,84 +1228,41 @@ function getFilteredPOIs() {
   return currentData.pois;
 }
 
-// Add distance markers every 20km along the track
+// Bornes kilométriques — affiche la distance restante à parcourir
 function addDistanceMarkers(track) {
   const intervalKm = 20;
-  let cumulativeDistance = 0;
-  let nextMarkerKm = 0;
 
-  // Add start marker (0 km)
-  addDistanceMarker(track[0].lat, track[0].lon, 0);
-  nextMarkerKm = intervalKm;
-
+  // Calcul de la distance totale
+  let totalKm = 0;
   for (let i = 1; i < track.length; i++) {
-    const segmentDistance = haversineDistance(
-      track[i - 1].lat, track[i - 1].lon,
-      track[i].lat, track[i].lon
-    );
-
-    const prevCumulative = cumulativeDistance;
-    cumulativeDistance += segmentDistance / 1000; // Convert to km
-
-    // Check if we crossed a marker point
-    while (cumulativeDistance >= nextMarkerKm) {
-      // Interpolate position
-      const ratio = (nextMarkerKm - prevCumulative) / (cumulativeDistance - prevCumulative);
-      const lat = track[i - 1].lat + ratio * (track[i].lat - track[i - 1].lat);
-      const lon = track[i - 1].lon + ratio * (track[i].lon - track[i - 1].lon);
-
-      addDistanceMarker(lat, lon, nextMarkerKm);
-      nextMarkerKm += intervalKm;
-    }
+    totalKm += haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon) / 1000;
   }
-}
+  totalKm = Math.round(totalKm * 10) / 10;
 
-function addDistanceMarker(lat, lon, km) {
-  const icon = L.divIcon({
-    className: 'distance-marker',
-    html: `<div class="distance-marker-inner">${km}</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  });
-
-  const marker = L.marker([lat, lon], { icon }).addTo(map);
-  marker.bindTooltip(`${km} km`, { permanent: false, direction: 'top' });
-  distanceMarkers.push(marker);
-}
-
-function getBearing(lat1, lon1, lat2, lon2) {
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const y = Math.sin(dLon) * Math.cos(φ2);
-  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLon);
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-function addTrackArrows(track) {
-  const intervalKm = 5;
   let cumDist = 0;
-  let nextArrowKm = intervalKm / 2; // offset de 2.5km pour ne jamais coïncider avec les bornes (0, 20, 40…)
+  let nextMarkerKm = intervalKm;
 
   for (let i = 1; i < track.length; i++) {
     const segDist = haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon) / 1000;
     const prevCum = cumDist;
     cumDist += segDist;
 
-    while (cumDist >= nextArrowKm) {
-      const ratio = (nextArrowKm - prevCum) / (cumDist - prevCum);
+    while (cumDist >= nextMarkerKm) {
+      const ratio = (nextMarkerKm - prevCum) / (cumDist - prevCum);
       const lat = track[i-1].lat + ratio * (track[i].lat - track[i-1].lat);
       const lon = track[i-1].lon + ratio * (track[i].lon - track[i-1].lon);
-      const bearing = getBearing(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon);
+      const remaining = Math.round(totalKm - nextMarkerKm);
 
       const icon = L.divIcon({
-        className: 'track-arrow',
-        html: `<div class="track-arrow-inner" style="transform:rotate(${bearing}deg)"></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        className: 'distance-marker',
+        html: `<div class="distance-marker-inner">${remaining}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
-      distanceMarkers.push(L.marker([lat, lon], { icon, interactive: false }).addTo(map));
-      nextArrowKm += intervalKm;
+      const marker = L.marker([lat, lon], { icon }).addTo(map);
+      marker.bindTooltip(`${remaining} km restants`, { permanent: false, direction: 'top' });
+      distanceMarkers.push(marker);
+      nextMarkerKm += intervalKm;
     }
   }
 }

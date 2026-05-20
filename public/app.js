@@ -768,6 +768,10 @@ async function showMap(data) {
   buildTypeFilterPanel({ pois: allPoiMarkers.map(e => e.poi) });
   if (showOnlyFavorites) applyFavoritesFilter();
 
+  // Distance markers + direction arrows
+  addDistanceMarkers(data.track);
+  addTrackArrows(data.track);
+
   // Fit bounds
   map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
 
@@ -1258,6 +1262,43 @@ function addDistanceMarker(lat, lon, km) {
   const marker = L.marker([lat, lon], { icon }).addTo(map);
   marker.bindTooltip(`${km} km`, { permanent: false, direction: 'top' });
   distanceMarkers.push(marker);
+}
+
+function getBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function addTrackArrows(track) {
+  const intervalKm = 5;
+  let cumDist = 0;
+  let nextArrowKm = intervalKm;
+
+  for (let i = 1; i < track.length; i++) {
+    const segDist = haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon) / 1000;
+    const prevCum = cumDist;
+    cumDist += segDist;
+
+    while (cumDist >= nextArrowKm) {
+      const ratio = (nextArrowKm - prevCum) / (cumDist - prevCum);
+      const lat = track[i-1].lat + ratio * (track[i].lat - track[i-1].lat);
+      const lon = track[i-1].lon + ratio * (track[i].lon - track[i-1].lon);
+      const bearing = getBearing(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon);
+
+      const icon = L.divIcon({
+        className: 'track-arrow',
+        html: `<div class="track-arrow-inner" style="transform:rotate(${bearing}deg)"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      distanceMarkers.push(L.marker([lat, lon], { icon, interactive: false }).addTo(map));
+      nextArrowKm += intervalKm;
+    }
+  }
 }
 
 function haversineDistance(lat1, lon1, lat2, lon2) {

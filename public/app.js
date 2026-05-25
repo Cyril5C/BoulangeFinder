@@ -16,6 +16,7 @@ let selectedPoiTypes = [];
 let userLocationMarker = null;
 let distanceMarkers = [];
 let showKmMarkers = false;
+let kmMarkersAdded = false; // guard contre double-appel
 let isOffline = !navigator.onLine;
 let allPoiMarkers = [];
 let activePoiTypeFilters = new Set();
@@ -736,6 +737,7 @@ async function showMap(data) {
   });
   distanceMarkers.forEach(marker => map.removeLayer(marker));
   distanceMarkers = [];
+  kmMarkersAdded = false;
 
   // Draw track
   const trackCoords = data.track.map(p => [p.lat, p.lon]);
@@ -1063,6 +1065,7 @@ document.getElementById('km-markers-btn').addEventListener('click', () => {
   document.getElementById('km-markers-btn').classList.toggle('active', showKmMarkers);
   distanceMarkers.forEach(m => map.removeLayer(m));
   distanceMarkers = [];
+  kmMarkersAdded = false;
   if (showKmMarkers && currentData?.track) addDistanceMarkers(currentData.track);
 });
 
@@ -1230,6 +1233,8 @@ function getFilteredPOIs() {
 
 // Bornes kilométriques — affiche la distance restante à parcourir
 function addDistanceMarkers(track) {
+  if (kmMarkersAdded) return;
+  kmMarkersAdded = true;
   const intervalKm = 20;
 
   // Calcul de la distance totale
@@ -1586,13 +1591,11 @@ function generateRoadmapImage(startKm, endKm) {
 
   const track = currentData.track;
 
-  // Sort all favorites by position along track
   const all = favorites.map(poi => {
     const pos = getTrackPosition(poi, track);
     return { poi, distDone: pos.distDone ?? 0 };
   }).sort((a, b) => a.distDone - b.distDone);
 
-  // Clamp to the requested segment
   const segEnd = endKm ?? (all.length ? all[all.length-1].distDone + 1 : 999);
   const sorted = all
     .filter(({ distDone }) => distDone >= startKm && distDone <= segEnd)
@@ -1602,129 +1605,109 @@ function generateRoadmapImage(startKm, endKm) {
       distRemaining: Math.round((segEnd - distDone) * 10) / 10
     }));
 
-  const segLength = Math.round((segEnd - startKm) * 10) / 10;
-
-  // Taille exacte fond d'écran iPhone 16 : 1179 × 2556 px
+  // iPhone 16 dimensions
   const W = 1179;
   const H = 2556;
-  const nRows = sorted.length + 1; // départ + favoris
-  const ROW_H = Math.floor(H / nRows);
-  const PAD = 64;
   const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
+  const MARGIN = 32;
+  const GAP = 6;
+  const COLS = 3;
+  const ROWS = 4;
+  const PAGE_SIZE = COLS * ROWS;
+  const CELL_ZONE_TOP = 635;
+  // Tailles de police
+  const KM_FONT    = 130;
+  const EMOJI_FONT = 96;
+  // Positions (offsets depuis cy), ascent ≈ 80% de la taille de police
+  const PAD_TOP  = 20;
+  const KM_Y     = PAD_TOP + Math.round(KM_FONT * 0.80);   // ~124
+  const BAR_Y    = KM_Y + 14;    // top barre, bottom = BAR_Y + 10
+  const EMOJI_Y  = BAR_Y + 10 + 30 + Math.round(EMOJI_FONT * 0.80); // 30px gap sous la barre
+  const PAD_BOT  = 14;
+  const CELL_H   = EMOJI_Y + PAD_BOT;
+  const CELL_W   = Math.floor((W - 2 * MARGIN - (COLS - 1) * GAP) / COLS);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = W;   // 1179 px — largeur exacte iPhone 16
-  canvas.height = H;  // 2556 px — hauteur exacte iPhone 16
-  const ctx = canvas.getContext('2d');
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE) || 1;
+  const zip = new JSZip();
 
-  // Fond très sombre — contraste maximal en plein soleil
-  ctx.fillStyle = '#0d1117';
-  ctx.fillRect(0, 0, W, H);
+  for (let page = 0; page < totalPages; page++) {
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
 
-  function clampText(text, maxW, fontSize) {
-    ctx.font = `bold ${fontSize}px ${FONT}`;
-    if (ctx.measureText(text).width <= maxW) return text;
-    while (text.length > 1 && ctx.measureText(text + '…').width > maxW) text = text.slice(0, -1);
-    return text + '…';
-  }
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, W, H);
 
-  function drawRow(idx, kmNum, kmUnit, emoji, nameLine, distLine, special) {
-    const y = idx * ROW_H;
-
-    // Background
-    ctx.fillStyle = special ? '#161b27' : (idx % 2 === 0 ? '#0d1117' : '#111827');
-    ctx.fillRect(0, y, W, ROW_H);
-
-    // Separator
-    ctx.strokeStyle = '#1e2d40';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
-
-    const midY = y + ROW_H / 2;
-
-    if (special) {
-      // Départ / Arrivée : km très grand + label centré verticalement
-      ctx.fillStyle = '#c7d2fe';
-      ctx.font = `bold 160px ${FONT}`;
-      ctx.textAlign = 'left';
-      ctx.fillText(kmNum, PAD, midY + 56);
-      ctx.fillStyle = '#818cf8';
-      ctx.font = `bold 64px ${FONT}`;
-      ctx.fillText(kmUnit, PAD, midY + 130);
-      ctx.fillStyle = '#f1f5f9';
-      ctx.font = `bold 72px ${FONT}`;
-      ctx.textAlign = 'right';
-      ctx.fillText(nameLine, W - PAD, midY + 28);
-      ctx.textAlign = 'left';
-    } else {
-      // Km (très grand, colonne gauche)
-      const KM_COL = 420;
-      ctx.fillStyle = '#c7d2fe';
-      ctx.font = `bold 170px ${FONT}`;
-      ctx.textAlign = 'right';
-      ctx.fillText(kmNum, KM_COL, midY + 54);
-      ctx.fillStyle = '#818cf8';
-      ctx.font = `bold 58px ${FONT}`;
-      ctx.fillText(kmUnit, KM_COL, midY + 124);
-      ctx.textAlign = 'left';
-
-      // Séparateur vertical
-      ctx.strokeStyle = '#1e2d40';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(KM_COL + 36, y + 40); ctx.lineTo(KM_COL + 36, y + ROW_H - 40); ctx.stroke();
-
-      // Colonne droite : emoji + nom + distance
-      const RX = KM_COL + 72;
-      const maxNameW = W - RX - PAD;
-
-      // Emoji très grand
-      ctx.font = `${Math.round(ROW_H * 0.34)}px sans-serif`;
-      ctx.fillText(emoji, RX, midY + 12);
-      const emojiW = ctx.measureText(emoji).width;
-
-      // Nom
-      const nameX = RX + emojiW + 28;
-      const nameSize = Math.round(ROW_H * 0.165);
-      const name = clampText(nameLine, W - nameX - PAD, nameSize);
-      ctx.fillStyle = '#f1f5f9';
-      ctx.font = `bold ${nameSize}px ${FONT}`;
-      ctx.fillText(name, nameX, midY - 14);
-
-      // Distance de la trace
-      ctx.fillStyle = '#64748b';
-      ctx.font = `${Math.round(ROW_H * 0.115)}px ${FONT}`;
-      ctx.fillText(distLine, nameX, midY + nameSize * 0.8);
+    function rrect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
     }
+
+    for (let i = 0; i < PAGE_SIZE; i++) {
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      const cx = MARGIN + col * (CELL_W + GAP);
+      const cy = CELL_ZONE_TOP + row * (CELL_H + GAP);
+
+      ctx.fillStyle = i % 2 === 0 ? '#111827' : '#161b27';
+      rrect(cx, cy, CELL_W, CELL_H, 28);
+      ctx.fill();
+
+      const item = sorted[page * PAGE_SIZE + i];
+      if (!item) continue;
+
+      const { poi, distRemaining } = item;
+      const meta = POI_META[poi.type] || { label: poi.type, emoji: '📍' };
+      const kmStr = distRemaining % 1
+        ? `${Math.floor(distRemaining)}.${Math.round((distRemaining % 1) * 10)}`
+        : String(distRemaining);
+
+      const midX = cx + CELL_W / 2;
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#c7d2fe';
+      ctx.font = `bold ${KM_FONT}px ${FONT}`;
+      ctx.fillText(kmStr, midX, cy + KM_Y);
+
+      const d = poi.distance;
+      const maxLineW = CELL_W - 48;
+      const lineW = Math.round(Math.min(d / 2000, 1) * maxLineW);
+      const barX = midX - lineW / 2;
+      ctx.fillStyle = '#818cf8';
+      ctx.beginPath();
+      ctx.roundRect(barX, cy + BAR_Y, lineW, 10, 5);
+      ctx.fill();
+
+      ctx.font = `${EMOJI_FONT}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(meta.emoji, midX, cy + EMOJI_Y);
+    }
+
+    const suffix = totalPages > 1 ? `_${page + 1}` : '';
+    const b64 = canvas.toDataURL('image/png').split(',')[1];
+    zip.file(`roadmap${suffix}.png`, b64, { base64: true });
   }
 
-  const km0 = String(Math.floor(segLength));
-  const km0dec = segLength % 1 ? '.' + String(Math.round((segLength % 1) * 10)) : '';
-  drawRow(0, km0 + km0dec, 'km', '', 'Départ', '', true);
-
-  sorted.forEach(({ poi, distRemaining }, i) => {
-    const meta = POI_META[poi.type] || { label: poi.type, emoji: '📍' };
-    const km = String(distRemaining).replace('.', '.');
-    const [kmInt, kmDec] = km.split('.');
-    drawRow(
-      i + 1,
-      kmDec ? `${kmInt}.${kmDec}` : kmInt,
-      `${poi.distance}m`,
-      meta.emoji,
-      poi.name,
-      `${meta.label}  ·  à ${poi.distance}m`,
-      false
-    );
+  zip.generateAsync({ type: 'blob' }).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'roadmap.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
-
-
-  // Download
-  const dataUrl = canvas.toDataURL('image/png');
-  const a = document.createElement('a');
-  a.href = dataUrl;
-  a.download = 'roadmap.png';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
 }
 
 function downloadFile(content, filename, type) {

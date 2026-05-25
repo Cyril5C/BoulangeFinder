@@ -1,4 +1,4 @@
-const CACHE_NAME = 'boulanges-finder-v19';
+const CACHE_NAME = 'boulanges-finder-v20';
 // Tile cache is intentionally versioned separately so app updates
 // never wipe the tiles the user pre-cached for offline use.
 const TILE_CACHE_NAME = 'boulanges-tiles-v1';

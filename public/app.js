@@ -12,6 +12,7 @@ let poiLayers = {
   supermarket: null
 };
 let currentData = null;
+let currentTraceName = null;
 let selectedPoiTypes = [];
 let userLocationMarker = null;
 let distanceMarkers = [];
@@ -577,6 +578,7 @@ async function displayServerTracesList() {
           if (!r.ok) { alert('Trace introuvable sur le serveur'); return; }
           currentData = await r.json();
           currentTraceKey = trace.id;
+          currentTraceName = trace.name;
           showMap(currentData);
         } catch (e) {
           alert('Erreur lors du chargement de la trace');
@@ -615,6 +617,8 @@ gpxForm.addEventListener('submit', async (e) => {
 
   const file = gpxFileInput.files[0];
   if (!file) return;
+
+  currentTraceName = file.name.replace(/\.gpx$/i, '');
 
   // Get selected POI types
   selectedPoiTypes = [];
@@ -1073,26 +1077,26 @@ document.getElementById('cache-offline-btn').addEventListener('click', () => {
   if (currentData?.track) cacheTrackTiles(currentData.track);
 });
 
-document.getElementById('roadmap-btn').addEventListener('click', () => {
+document.getElementById('roadbook-btn').addEventListener('click', () => {
   if (!currentData?.track) return;
   let totalM = 0;
   const t = currentData.track;
   for (let i = 1; i < t.length; i++) totalM += haversineDistance(t[i-1].lat, t[i-1].lon, t[i].lat, t[i].lon);
   const totalKm = Math.round(totalM / 100) / 10;
-  document.getElementById('roadmap-start').value = 0;
-  document.getElementById('roadmap-end').value = totalKm;
-  document.getElementById('roadmap-modal').classList.remove('hidden');
+  document.getElementById('roadbook-start').value = 0;
+  document.getElementById('roadbook-end').value = totalKm;
+  document.getElementById('roadbook-modal').classList.remove('hidden');
 });
 
-document.getElementById('cancel-roadmap').addEventListener('click', () => {
-  document.getElementById('roadmap-modal').classList.add('hidden');
+document.getElementById('cancel-roadbook').addEventListener('click', () => {
+  document.getElementById('roadbook-modal').classList.add('hidden');
 });
 
-document.getElementById('confirm-roadmap').addEventListener('click', () => {
-  const startKm = parseFloat(document.getElementById('roadmap-start').value) || 0;
-  const endKm   = parseFloat(document.getElementById('roadmap-end').value);
-  document.getElementById('roadmap-modal').classList.add('hidden');
-  generateRoadmapImage(startKm, endKm);
+document.getElementById('confirm-roadbook').addEventListener('click', () => {
+  const startKm = parseFloat(document.getElementById('roadbook-start').value) || 0;
+  const endKm   = parseFloat(document.getElementById('roadbook-end').value);
+  document.getElementById('roadbook-modal').classList.add('hidden');
+  generateRoadbookImage(startKm, endKm);
 });
 
 // Custom POI modal
@@ -1580,7 +1584,7 @@ function isOpenNow(openingHours) {
   return false;
 }
 
-function generateRoadmapImage(startKm, endKm) {
+function generateRoadbookImage(startKm, endKm) {
   if (!currentData) return;
   const favorites = (currentData.pois || []).filter(p => favoritePois.has(String(p.id)));
 
@@ -1628,7 +1632,8 @@ function generateRoadmapImage(startKm, endKm) {
   const CELL_W   = Math.floor((W - 2 * MARGIN - (COLS - 1) * GAP) / COLS);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE) || 1;
-  const zip = new JSZip();
+  const baseName = (currentTraceName || 'roadbook').replace(/[\\/:*?"<>|]/g, '_');
+  const canvases = [];
 
   for (let page = 0; page < totalPages; page++) {
     const canvas = document.createElement('canvas');
@@ -1666,6 +1671,11 @@ function generateRoadmapImage(startKm, endKm) {
       const item = sorted[page * PAGE_SIZE + i];
       if (!item) continue;
 
+      ctx.strokeStyle = '#818cf8';
+      ctx.lineWidth = 3;
+      rrect(cx, cy, CELL_W, CELL_H, 28);
+      ctx.stroke();
+
       const { poi, distRemaining } = item;
       const meta = POI_META[poi.type] || { label: poi.type, emoji: '📍' };
       const kmStr = distRemaining % 1
@@ -1693,21 +1703,32 @@ function generateRoadmapImage(startKm, endKm) {
       ctx.fillText(meta.emoji, midX, cy + EMOJI_Y);
     }
 
-    const suffix = totalPages > 1 ? `_${page + 1}` : '';
-    const b64 = canvas.toDataURL('image/png').split(',')[1];
-    zip.file(`roadmap${suffix}.png`, b64, { base64: true });
+    canvases.push(canvas);
   }
 
-  zip.generateAsync({ type: 'blob' }).then(blob => {
+  function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'roadmap.zip';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  if (canvases.length === 1) {
+    canvases[0].toBlob(blob => downloadBlob(blob, `${baseName}.png`));
+    return;
+  }
+
+  const zip = new JSZip();
+  canvases.forEach((canvas, i) => {
+    const b64 = canvas.toDataURL('image/png').split(',')[1];
+    zip.file(`${baseName}_${i + 1}.png`, b64, { base64: true });
   });
+
+  zip.generateAsync({ type: 'blob' }).then(blob => downloadBlob(blob, `${baseName}.zip`));
 }
 
 function downloadFile(content, filename, type) {

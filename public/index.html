@@ -110,7 +110,7 @@
       <button id="back-btn" class="control-btn">←</button>
       <button id="share-btn" class="control-btn" title="Partager">🔗</button>
       <button id="fav-filter-btn" class="control-btn" title="Afficher seulement les favoris">☆</button>
-      <button id="roadmap-btn" class="control-btn" title="Générer roadmap des favoris">📋</button>
+      <button id="roadbook-btn" class="control-btn" title="Générer Roadbook des favoris">📋</button>
       <button id="add-poi-btn" class="control-btn" title="Ajouter un POI manuellement">➕</button>
       <button id="km-markers-btn" class="control-btn" title="Afficher les bornes kilométriques">📏</button>
       <button id="cache-offline-btn" class="control-btn" title="Préparer pour hors-ligne">📥</button>
@@ -136,23 +136,23 @@
       </button>
     </div>
 
-    <!-- Roadmap range modal -->
-    <div id="roadmap-modal" class="modal hidden">
+    <!-- Roadbook range modal -->
+    <div id="roadbook-modal" class="modal hidden">
       <div class="modal-content">
-        <h3>Bornes de la roadmap</h3>
+        <h3>Bornes du Roadbook</h3>
         <div style="display:flex;gap:12px;">
           <div style="flex:1">
             <label style="font-size:0.8rem;color:#6b7280;display:block;margin-bottom:4px;">Début (km)</label>
-            <input type="number" id="roadmap-start" min="0" step="0.1">
+            <input type="number" id="roadbook-start" min="0" step="0.1">
           </div>
           <div style="flex:1">
             <label style="font-size:0.8rem;color:#6b7280;display:block;margin-bottom:4px;">Fin (km)</label>
-            <input type="number" id="roadmap-end" min="0" step="0.1">
+            <input type="number" id="roadbook-end" min="0" step="0.1">
           </div>
         </div>
         <div class="modal-actions">
-          <button id="cancel-roadmap" class="modal-btn modal-btn-cancel">Annuler</button>
-          <button id="confirm-roadmap" class="modal-btn modal-btn-confirm">Générer</button>
+          <button id="cancel-roadbook" class="modal-btn modal-btn-cancel">Annuler</button>
+          <button id="confirm-roadbook" class="modal-btn modal-btn-confirm">Générer</button>
         </div>
       </div>
     </div>

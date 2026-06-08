@@ -15,9 +15,7 @@ let currentData = null;
 let currentTraceName = null;
 let selectedPoiTypes = [];
 let userLocationMarker = null;
-let distanceMarkers = [];
 let showKmMarkers = false;
-let kmMarkersAdded = false; // guard contre double-appel
 let isOffline = !navigator.onLine;
 let allPoiMarkers = [];
 let activePoiTypeFilters = new Set();
@@ -28,6 +26,8 @@ let customPois = [];
 let currentTraceKey = null;
 let addPoiMode = false;
 let pendingCustomPoiLatLon = null;
+let poiComments = new Map();
+let pendingCommentPoiId = null;
 
 // ── Favorites ───────────────────────────────────────────────────────────────
 
@@ -91,6 +91,40 @@ function applyFavoritesFilter() {
       layer.removeLayer(marker);
     }
   });
+}
+
+// ── Comments ────────────────────────────────────────────────────────────────
+
+async function loadComments() {
+  try {
+    const res = await fetch('/api/comments', { credentials: 'same-origin' });
+    if (res.ok) {
+      poiComments = new Map(Object.entries(await res.json()));
+    }
+  } catch (e) {
+    poiComments = new Map();
+  }
+}
+
+async function saveComment(poiId, text) {
+  const id = String(poiId);
+  try {
+    const res = await fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id, text })
+    });
+    if (res.ok) {
+      poiComments = new Map(Object.entries(await res.json()));
+    }
+  } catch (e) {
+    if (text.trim()) poiComments.set(id, text.trim());
+    else poiComments.delete(id);
+  }
+
+  const entry = markerByPoiId.get(id);
+  if (entry) entry.marker.setPopupContent(createPopupContent(entry.poi));
 }
 
 // ── Custom POIs ─────────────────────────────────────────────────────────────
@@ -727,6 +761,13 @@ async function showMap(data) {
   uploadSection.classList.add('hidden');
   mapSection.classList.remove('hidden');
 
+  // Trace info header
+  const { totalKm, elevationGain } = getTrackStats(data.track);
+  document.getElementById('trace-info-name').textContent = currentTraceName || '';
+  document.getElementById('trace-info-km').textContent = `📏 ${totalKm} km`;
+  document.getElementById('trace-info-elevation').textContent = `⛰️ D+ ${elevationGain} m`;
+  document.getElementById('trace-info').classList.remove('hidden');
+
   if (!map) {
     map = L.map('map');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -739,9 +780,6 @@ async function showMap(data) {
   Object.values(poiLayers).forEach(layer => {
     if (layer) map.removeLayer(layer);
   });
-  distanceMarkers.forEach(marker => map.removeLayer(marker));
-  distanceMarkers = [];
-  kmMarkersAdded = false;
 
   // Draw track
   const trackCoords = data.track.map(p => [p.lat, p.lon]);
@@ -760,6 +798,7 @@ async function showMap(data) {
 
   // Load state for this trace
   await loadFavorites();
+  await loadComments();
   if (currentTraceKey) await loadCustomPois(currentTraceKey);
 
   // Place OSM POIs
@@ -768,16 +807,18 @@ async function showMap(data) {
   // Place custom POIs
   customPois.forEach(poi => placePoiMarker(poi));
 
-  // Add layers to map
-  Object.values(poiLayers).forEach(layer => layer.addTo(map));
+  // Add layers to map (bornes kilométriques masquées par défaut, via le toggle)
+  Object.entries(poiLayers).forEach(([type, layer]) => {
+    if (type === 'borne') {
+      if (showKmMarkers) layer.addTo(map);
+    } else {
+      layer.addTo(map);
+    }
+  });
 
   // Restore filters
   buildTypeFilterPanel({ pois: allPoiMarkers.map(e => e.poi) });
   if (showOnlyFavorites) applyFavoritesFilter();
-
-  // Direction arrows (toujours affichées)
-  // Bornes kilométriques (masquées par défaut)
-  if (showKmMarkers) addDistanceMarkers(data.track);
 
   // Fit bounds
   map.fitBounds(trackLayer.getBounds(), { padding: [50, 50] });
@@ -886,6 +927,16 @@ function createPopupContent(poi) {
   }
 
   if (poi.type !== 'borne') {
+    const comment = poiComments.get(String(poi.id));
+    if (comment) {
+      html += `<p class="poi-comment">💬 ${escapeHtml(comment)}</p>`;
+    }
+    html += `<button class="comment-btn" data-poi-id="${escapeHtml(String(poi.id))}">
+      ${comment ? '✏️ Modifier le commentaire' : '💬 Ajouter un commentaire'}
+    </button>`;
+  }
+
+  if (poi.type !== 'borne') {
     html += `<a href="https://www.google.com/maps?q=${poi.lat},${poi.lon}" target="_blank" rel="noopener" class="nav-link-gmaps">Voir sur Google Maps</a>`;
   }
 
@@ -897,13 +948,43 @@ function createPopupContent(poi) {
   return html;
 }
 
-// Event delegation for popup buttons (fav + delete)
+// Event delegation for popup buttons (fav + delete + comment)
 document.getElementById('map').addEventListener('click', (e) => {
   const favBtn = e.target.closest('.fav-btn');
   if (favBtn) { toggleFavorite(favBtn.dataset.poiId); return; }
 
   const delBtn = e.target.closest('.delete-custom-poi');
   if (delBtn) { deleteCustomPoi(delBtn.dataset.poiId); return; }
+
+  const commentBtn = e.target.closest('.comment-btn');
+  if (commentBtn) {
+    pendingCommentPoiId = commentBtn.dataset.poiId;
+    document.getElementById('comment-text').value = poiComments.get(pendingCommentPoiId) || '';
+    document.getElementById('comment-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('comment-text').focus(), 50);
+    return;
+  }
+});
+
+// Comment modal
+document.getElementById('cancel-comment').addEventListener('click', () => {
+  document.getElementById('comment-modal').classList.add('hidden');
+  pendingCommentPoiId = null;
+});
+
+document.getElementById('comment-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('comment-modal')) {
+    document.getElementById('comment-modal').classList.add('hidden');
+    pendingCommentPoiId = null;
+  }
+});
+
+document.getElementById('confirm-comment').addEventListener('click', async () => {
+  if (!pendingCommentPoiId) return;
+  const text = document.getElementById('comment-text').value;
+  document.getElementById('comment-modal').classList.add('hidden');
+  await saveComment(pendingCommentPoiId, text);
+  pendingCommentPoiId = null;
 });
 
 function escapeHtml(str) {
@@ -1067,10 +1148,10 @@ addPoiBtn.addEventListener('click', () => {
 document.getElementById('km-markers-btn').addEventListener('click', () => {
   showKmMarkers = !showKmMarkers;
   document.getElementById('km-markers-btn').classList.toggle('active', showKmMarkers);
-  distanceMarkers.forEach(m => map.removeLayer(m));
-  distanceMarkers = [];
-  kmMarkersAdded = false;
-  if (showKmMarkers && currentData?.track) addDistanceMarkers(currentData.track);
+  const borneLayer = poiLayers.borne;
+  if (!borneLayer) return;
+  if (showKmMarkers) borneLayer.addTo(map);
+  else map.removeLayer(borneLayer);
 });
 
 document.getElementById('cache-offline-btn').addEventListener('click', () => {
@@ -1079,10 +1160,7 @@ document.getElementById('cache-offline-btn').addEventListener('click', () => {
 
 document.getElementById('roadbook-btn').addEventListener('click', () => {
   if (!currentData?.track) return;
-  let totalM = 0;
-  const t = currentData.track;
-  for (let i = 1; i < t.length; i++) totalM += haversineDistance(t[i-1].lat, t[i-1].lon, t[i].lat, t[i].lon);
-  const totalKm = Math.round(totalM / 100) / 10;
+  const { totalKm } = getTrackStats(currentData.track);
   document.getElementById('roadbook-start').value = 0;
   document.getElementById('roadbook-end').value = totalKm;
   document.getElementById('roadbook-modal').classList.remove('hidden');
@@ -1235,47 +1313,6 @@ function getFilteredPOIs() {
   return currentData.pois;
 }
 
-// Bornes kilométriques — affiche la distance restante à parcourir
-function addDistanceMarkers(track) {
-  if (kmMarkersAdded) return;
-  kmMarkersAdded = true;
-  const intervalKm = 20;
-
-  // Calcul de la distance totale
-  let totalKm = 0;
-  for (let i = 1; i < track.length; i++) {
-    totalKm += haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon) / 1000;
-  }
-  totalKm = Math.round(totalKm * 10) / 10;
-
-  let cumDist = 0;
-  let nextMarkerKm = intervalKm;
-
-  for (let i = 1; i < track.length; i++) {
-    const segDist = haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon) / 1000;
-    const prevCum = cumDist;
-    cumDist += segDist;
-
-    while (cumDist >= nextMarkerKm) {
-      const ratio = (nextMarkerKm - prevCum) / (cumDist - prevCum);
-      const lat = track[i-1].lat + ratio * (track[i].lat - track[i-1].lat);
-      const lon = track[i-1].lon + ratio * (track[i].lon - track[i-1].lon);
-      const remaining = Math.round(totalKm - nextMarkerKm);
-
-      const icon = L.divIcon({
-        className: 'distance-marker',
-        html: `<div class="distance-marker-inner">${remaining}</div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-      const marker = L.marker([lat, lon], { icon }).addTo(map);
-      marker.bindTooltip(`${remaining} km restants`, { permanent: false, direction: 'top' });
-      distanceMarkers.push(marker);
-      nextMarkerKm += intervalKm;
-    }
-  }
-}
-
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000; // Earth radius in meters
   const dLat = toRad(lat2 - lat1);
@@ -1289,6 +1326,23 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 
 function toRad(deg) {
   return deg * Math.PI / 180;
+}
+
+function getTrackStats(track) {
+  let totalM = 0;
+  let elevationGain = 0;
+  for (let i = 1; i < track.length; i++) {
+    totalM += haversineDistance(track[i-1].lat, track[i-1].lon, track[i].lat, track[i].lon);
+    const prevEle = track[i-1].ele;
+    const ele = track[i].ele;
+    if (prevEle != null && ele != null && ele > prevEle) {
+      elevationGain += ele - prevEle;
+    }
+  }
+  return {
+    totalKm: Math.round(totalM / 100) / 10,
+    elevationGain: Math.round(elevationGain)
+  };
 }
 
 function generateGPX(track) {

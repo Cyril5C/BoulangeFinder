@@ -105,6 +105,15 @@
   <div id="map-section" class="map-section hidden">
     <div id="map"></div>
 
+    <!-- Trace info header -->
+    <div id="trace-info" class="trace-info hidden">
+      <span id="trace-info-name" class="trace-info-name"></span>
+      <span class="trace-info-sep">·</span>
+      <span id="trace-info-km"></span>
+      <span class="trace-info-sep">·</span>
+      <span id="trace-info-elevation"></span>
+    </div>
+
     <!-- Controls Panel -->
     <div class="controls-panel" id="controls-panel">
       <button id="back-btn" class="control-btn">←</button>
@@ -177,6 +186,18 @@
         <div class="modal-actions">
           <button id="cancel-add-poi" class="modal-btn modal-btn-cancel">Annuler</button>
           <button id="confirm-add-poi" class="modal-btn modal-btn-confirm">Ajouter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- POI comment modal -->
+    <div id="comment-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Commentaire</h3>
+        <textarea id="comment-text" placeholder="Ex: Attention, ferme à midi" rows="3"></textarea>
+        <div class="modal-actions">
+          <button id="cancel-comment" class="modal-btn modal-btn-cancel">Annuler</button>
+          <button id="confirm-comment" class="modal-btn modal-btn-confirm">Enregistrer</button>
         </div>
       </div>
     </div>

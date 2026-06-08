@@ -7,6 +7,7 @@ const gpxRoutes = require('./routes/gpx');
 const shareRoutes = require('./routes/share');
 const favoritesRoutes = require('./routes/favorites');
 const customPoisRoutes = require('./routes/customPois');
+const commentsRoutes = require('./routes/comments');
 const tracesRoutes = require('./routes/traces');
 
 const app = express();
@@ -105,6 +106,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use('/api/gpx', gpxRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/custom-pois', customPoisRoutes);
+app.use('/api/comments', commentsRoutes);
 app.use('/api/traces', tracesRoutes);
 
 // Serve index.html for root

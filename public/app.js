@@ -9,7 +9,8 @@ let poiLayers = {
   hotel: null,
   camping: null,
   restaurant: null,
-  supermarket: null
+  supermarket: null,
+  ravito: null
 };
 let currentData = null;
 let currentTraceName = null;
@@ -253,6 +254,7 @@ const POI_META = {
   camping:     { label: 'Campings',     emoji: '⛺' },
   restaurant:  { label: 'Restaurants',  emoji: '🍽️' },
   supermarket: { label: 'Supermarchés', emoji: '🛒' },
+  ravito:      { label: 'Ravitos',       emoji: '🍌' },
   custom:      { label: 'Perso',        emoji: '📌' },
 };
 
@@ -276,17 +278,18 @@ const icons = {
   camping: createIcon('#16a34a', '⛺'),
   restaurant: createIcon('#ef4444', '🍽️'),
   supermarket: createIcon('#0ea5e9', '🛒'),
+  ravito: createIcon('#f97316', '🍌'),
   custom: createIcon('#7c3aed', '📌')
 };
 
 const POI_COLORS = {
   bakery: '#f59e0b', cafe: '#8b5cf6', water: '#3b82f6',
   toilets: '#10b981', hotel: '#ec4899', camping: '#16a34a',
-  restaurant: '#ef4444', supermarket: '#0ea5e9', custom: '#7c3aed'
+  restaurant: '#ef4444', supermarket: '#0ea5e9', ravito: '#f97316', custom: '#7c3aed'
 };
 const POI_EMOJIS = {
   bakery: '🥖', cafe: '☕', water: '💧', toilets: '🚻',
-  hotel: '🏨', camping: '⛺', restaurant: '🍽️', supermarket: '🛒', custom: '📌'
+  hotel: '🏨', camping: '⛺', restaurant: '🍽️', supermarket: '🛒', ravito: '🍌', custom: '📌'
 };
 
 function createFavoriteIcon(type) {
@@ -790,7 +793,7 @@ async function showMap(data) {
   }).addTo(map);
 
   // Create POI layers
-  ['bakery','cafe','water','toilets','hotel','camping','restaurant','supermarket','borne','custom'].forEach(t => {
+  ['bakery','cafe','water','toilets','hotel','camping','restaurant','supermarket','borne','ravito','custom'].forEach(t => {
     poiLayers[t] = L.layerGroup();
   });
   allPoiMarkers = [];
@@ -878,6 +881,7 @@ function createPopupContent(poi) {
     camping: 'Camping',
     restaurant: 'Restaurant',
     supermarket: 'Supermarché / Épicerie',
+    ravito: 'Ravitaillement',
     borne: 'Borne kilométrique'
   };
 

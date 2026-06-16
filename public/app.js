@@ -1640,7 +1640,8 @@ function isOpenNow(openingHours) {
 
 function generateRoadbookImage(startKm, endKm) {
   if (!currentData) return;
-  const favorites = (currentData.pois || []).filter(p => favoritePois.has(String(p.id)));
+  const allPois = [...(currentData.pois || []), ...customPois];
+  const favorites = allPois.filter(p => favoritePois.has(String(p.id)));
 
   if (!favorites.length) {
     alert('Aucun favori. Marque des POIs en favori (★) sur la carte.');

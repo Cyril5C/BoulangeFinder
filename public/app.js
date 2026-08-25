@@ -1590,8 +1590,8 @@ function buildTrackArrowLayer(track) {
       const icon = L.divIcon({
         className: 'track-arrow',
         html: `<div class="track-arrow-inner" style="transform:rotate(${bearing}deg)"></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
       });
       L.marker([lat, lon], { icon, interactive: false }).addTo(layer);
       nextArrowKm += intervalKm;

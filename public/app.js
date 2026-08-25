@@ -1013,7 +1013,9 @@ function isMobileViewport() {
 
 function openPoiModal(poi) {
   currentModalPoi = poi;
-  document.getElementById('poi-modal-body').innerHTML = createPopupContent(poi);
+  const body = document.getElementById('poi-modal-body');
+  body.innerHTML = createPopupContent(poi);
+  body.scrollTop = 0;
   document.getElementById('poi-modal').classList.remove('hidden');
 }
 
@@ -1040,29 +1042,77 @@ document.getElementById('poi-modal').addEventListener('click', (e) => {
   if (e.target === document.getElementById('poi-modal')) closePoiModal();
 });
 
-// Swipe down to close the POI modal (mobile only). Only starts tracking
-// once the scrollable body is at the top, so it doesn't fight normal scroll.
+// Returns the POIs the user can currently swipe through, sorted by position
+// along the track: favorites when viewing favorites-only, otherwise whatever
+// type filter chips are active — same scoping as what's actually shown on
+// the map, so swipe navigation never lands on a hidden POI.
+function getPoiNavContext() {
+  const track = currentData?.track;
+  if (!track) return [];
+  if (poiDistIndexTrack !== track) rebuildPoiDistIndex(track);
+  return poiDistIndex.filter(e =>
+    showOnlyFavorites ? favoritePois.has(e.id) : activePoiTypeFilters.has(e.poi.type)
+  );
+}
+
+function navigatePoiModal(direction) {
+  if (!currentModalPoi) return false;
+  const list = getPoiNavContext();
+  const idx = list.findIndex(e => e.id === String(currentModalPoi.id));
+  if (idx === -1) return false;
+  const nextIdx = direction === 'next' ? idx + 1 : idx - 1;
+  if (nextIdx < 0 || nextIdx >= list.length) return false;
+  openPoiModal(list[nextIdx].poi);
+  return true;
+}
+
+// Swipe on the POI modal (mobile only): down to close, left/right to jump to
+// the next/previous POI in the current context (favorites or type filters).
+// The first ~10px of movement decide the gesture's axis so a diagonal touch
+// doesn't trigger both at once; vertical closing only arms when the
+// scrollable body is already at the top, so it doesn't fight normal scroll.
 (function setupPoiModalSwipe() {
   const content = document.getElementById('poi-modal-content');
   const body = document.getElementById('poi-modal-body');
   const CLOSE_THRESHOLD = 100;
+  const NAV_THRESHOLD = 60;
 
+  let startX = 0;
   let startY = 0;
+  let deltaX = 0;
   let deltaY = 0;
+  let axis = null; // 'x' | 'y' | 'none' | null (undecided)
   let dragging = false;
 
   content.addEventListener('touchstart', (e) => {
-    if (!isMobileViewport() || body.scrollTop > 0) return;
+    if (!isMobileViewport()) return;
+    startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    deltaX = 0;
     deltaY = 0;
+    axis = null;
     dragging = true;
-    content.style.transition = 'none';
   }, { passive: true });
 
   content.addEventListener('touchmove', (e) => {
     if (!dragging) return;
+    deltaX = e.touches[0].clientX - startX;
     deltaY = e.touches[0].clientY - startY;
-    if (deltaY > 0) {
+
+    if (!axis) {
+      if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) return;
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        axis = 'x';
+      } else {
+        axis = (deltaY > 0 && body.scrollTop <= 0) ? 'y' : 'none';
+      }
+      if (axis !== 'none') content.style.transition = 'none';
+    }
+
+    if (axis === 'x') {
+      e.preventDefault();
+      content.style.transform = `translateX(${deltaX}px)`;
+    } else if (axis === 'y') {
       e.preventDefault();
       content.style.transform = `translateY(${deltaY}px)`;
     }
@@ -1073,16 +1123,31 @@ document.getElementById('poi-modal').addEventListener('click', (e) => {
     dragging = false;
     content.style.transition = 'transform 0.2s ease';
 
-    if (deltaY > CLOSE_THRESHOLD) {
+    if (axis === 'y' && deltaY > CLOSE_THRESHOLD) {
       content.style.transform = 'translateY(100%)';
       setTimeout(() => {
         closePoiModal();
         content.style.transition = '';
         content.style.transform = '';
       }, 200);
+    } else if (axis === 'x' && Math.abs(deltaX) > NAV_THRESHOLD) {
+      const direction = deltaX < 0 ? 'next' : 'prev';
+      const moved = navigatePoiModal(direction);
+      if (moved) {
+        // New content already swapped in — slide it in from the swipe direction.
+        content.style.transition = 'none';
+        content.style.transform = `translateX(${deltaX < 0 ? '40px' : '-40px'})`;
+        requestAnimationFrame(() => {
+          content.style.transition = 'transform 0.2s ease';
+          content.style.transform = '';
+        });
+      } else {
+        content.style.transform = '';
+      }
     } else {
       content.style.transform = '';
     }
+    axis = null;
   });
 })();
 

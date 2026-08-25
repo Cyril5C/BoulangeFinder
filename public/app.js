@@ -139,6 +139,7 @@ async function loadCustomPois(traceKey) {
   } catch (e) {
     customPois = [];
   }
+  invalidatePoiDistIndex();
 }
 
 async function addCustomPoi(lat, lon, name, type, notes) {
@@ -164,6 +165,7 @@ async function addCustomPoi(lat, lon, name, type, notes) {
   } catch (e) {
     customPois.push(poi);
   }
+  invalidatePoiDistIndex();
   placePoiMarker(poi);
   buildTypeFilterPanel({ pois: allPoiMarkers.map(e => e.poi) });
   return poi;
@@ -178,6 +180,7 @@ async function deleteCustomPoi(poiId) {
   } catch (e) { /* offline — remove locally anyway */ }
 
   customPois = customPois.filter(p => p.id !== poiId);
+  invalidatePoiDistIndex();
   const entry = markerByPoiId.get(String(poiId));
   if (entry) {
     const { marker, type } = entry;
@@ -812,6 +815,11 @@ async function showMap(data) {
   // Place custom POIs
   customPois.forEach(poi => placePoiMarker(poi));
 
+  // Pre-warm the "next POIs" distance index in the background so the first
+  // popup/modal opened by the user doesn't pay that cost itself.
+  invalidatePoiDistIndex();
+  if (data.track) setTimeout(() => rebuildPoiDistIndex(data.track), 0);
+
   // Add layers to map (bornes kilométriques masquées par défaut, via le toggle)
   Object.entries(poiLayers).forEach(([type, layer]) => {
     if (type === 'borne') {
@@ -865,7 +873,9 @@ function placePoiMarker(poi) {
   }
 
   const marker = L.marker([poi.lat, poi.lon], { icon });
-  marker.bindPopup(createPopupContent(poi));
+  // Lazy content: createPopupContent() now scans all POIs (for "next POIs"),
+  // so it must run on open, not eagerly for every marker at map load.
+  marker.bindPopup(() => createPopupContent(poi));
   marker.poiData = poi;
   marker.on('click', () => {
     if (isMobileViewport()) {
@@ -950,6 +960,18 @@ function createPopupContent(poi) {
     html += `<a href="https://www.google.com/maps?q=${poi.lat},${poi.lon}" target="_blank" rel="noopener" class="nav-link-gmaps">Voir sur Google Maps</a>`;
   }
 
+  if (poi.type !== 'borne' && distDone !== null) {
+    const nextPois = getNextPois(poi, distDone, 3);
+    if (nextPois.length) {
+      html += '<p>Prochains favoris :</p>';
+      nextPois.forEach(({ poi: nextPoi, distDone: nextDistDone }) => {
+        const emoji = POI_EMOJIS[nextPoi.type] || '📍';
+        const delta = Math.round((nextDistDone - distDone) * 10) / 10;
+        html += `<p>${emoji} ${escapeHtml(nextPoi.name)} · +${delta} km</p>`;
+      });
+    }
+  }
+
   if (poi.isCustom) {
     html += `<button class="delete-custom-poi" data-poi-id="${escapeHtml(String(poi.id))}">🗑️ Supprimer ce POI</button>`;
   }
@@ -971,6 +993,7 @@ document.addEventListener('click', (e) => {
   if (commentBtn) {
     pendingCommentPoiId = commentBtn.dataset.poiId;
     document.getElementById('comment-text').value = poiComments.get(pendingCommentPoiId) || '';
+    document.getElementById('poi-modal').classList.add('hidden');
     document.getElementById('comment-modal').classList.remove('hidden');
     setTimeout(() => document.getElementById('comment-text').focus(), 50);
     return;
@@ -1003,6 +1026,13 @@ function refreshPoiModalIfOpen(poiId) {
   }
 }
 
+// Re-show the POI modal after the comment modal (opened on top of it) closes.
+function restorePoiModal() {
+  if (currentModalPoi) {
+    document.getElementById('poi-modal').classList.remove('hidden');
+  }
+}
+
 document.getElementById('poi-modal-close').addEventListener('click', closePoiModal);
 document.getElementById('poi-modal').addEventListener('click', (e) => {
   if (e.target === document.getElementById('poi-modal')) closePoiModal();
@@ -1012,12 +1042,14 @@ document.getElementById('poi-modal').addEventListener('click', (e) => {
 document.getElementById('cancel-comment').addEventListener('click', () => {
   document.getElementById('comment-modal').classList.add('hidden');
   pendingCommentPoiId = null;
+  restorePoiModal();
 });
 
 document.getElementById('comment-modal').addEventListener('click', (e) => {
   if (e.target === document.getElementById('comment-modal')) {
     document.getElementById('comment-modal').classList.add('hidden');
     pendingCommentPoiId = null;
+    restorePoiModal();
   }
 });
 
@@ -1027,6 +1059,7 @@ document.getElementById('confirm-comment').addEventListener('click', async () =>
   document.getElementById('comment-modal').classList.add('hidden');
   await saveComment(pendingCommentPoiId, text);
   pendingCommentPoiId = null;
+  restorePoiModal();
 });
 
 function escapeHtml(str) {
@@ -1404,14 +1437,25 @@ function generateGPX(track) {
   return gpx;
 }
 
-function getTrackPosition(poi, track) {
-  if (!track || track.length < 2) return { distDone: null, distRemaining: null };
+// Cumulative distance along a track is the same for every POI, so cache it
+// per track instead of recomputing it on every getTrackPosition() call —
+// getNextPois() alone calls this once per other POI on the map.
+let _cumDistCache = null; // { track, cumDist, totalDist }
 
+function getCumDist(track) {
+  if (_cumDistCache && _cumDistCache.track === track) return _cumDistCache;
   const cumDist = [0];
   for (let i = 1; i < track.length; i++) {
     cumDist.push(cumDist[i - 1] + haversineDistance(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon));
   }
-  const totalDist = cumDist[cumDist.length - 1];
+  _cumDistCache = { track, cumDist, totalDist: cumDist[cumDist.length - 1] };
+  return _cumDistCache;
+}
+
+function getTrackPosition(poi, track) {
+  if (!track || track.length < 2) return { distDone: null, distRemaining: null };
+
+  const { cumDist, totalDist } = getCumDist(track);
 
   let bestDist = Infinity;
   let bestDistDone = 0;
@@ -1434,6 +1478,44 @@ function getTrackPosition(poi, track) {
     distDone: Math.round(bestDistDone / 100) / 10,       // km, 1 décimale
     distRemaining: Math.round((totalDist - bestDistDone) / 100) / 10
   };
+}
+
+// Distance-along-track for every POI, computed once per track/POI-set and
+// reused across popup opens instead of re-walking the whole track each click
+// (getTrackPosition() is O(track length), so doing it for every POI on every
+// click was O(POI count × track length) — slow on long tracks).
+let poiDistIndex = [];
+let poiDistIndexTrack = null;
+
+function invalidatePoiDistIndex() {
+  poiDistIndexTrack = null;
+}
+
+function rebuildPoiDistIndex(track) {
+  const allPois = [...(currentData?.pois || []), ...customPois];
+  poiDistIndex = allPois
+    .filter(p => p.type !== 'borne')
+    .map(p => ({ id: String(p.id), poi: p, distDone: getTrackPosition(p, track).distDone }))
+    .filter(e => e.distDone !== null)
+    .sort((a, b) => a.distDone - b.distDone);
+  poiDistIndexTrack = track;
+}
+
+function getNextPois(poi, currentDistDone, limit) {
+  const track = currentData?.track;
+  if (!track) return [];
+
+  if (poiDistIndexTrack !== track) rebuildPoiDistIndex(track);
+
+  const id = String(poi.id);
+  const result = [];
+  for (const entry of poiDistIndex) {
+    if (entry.id === id || entry.distDone <= currentDistDone) continue;
+    if (!favoritePois.has(entry.id)) continue;
+    result.push(entry);
+    if (result.length >= limit) break;
+  }
+  return result;
 }
 
 function generateCSV(pois, track) {

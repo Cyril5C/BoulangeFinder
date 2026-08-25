@@ -702,6 +702,14 @@ body.offline .map-section {
   background: #0ea5e9;
 }
 
+.poi-type.camping {
+  background: #16a34a;
+}
+
+.poi-type.ravito {
+  background: #f97316;
+}
+
 /* Favorite button in popup */
 .fav-btn {
   display: block;

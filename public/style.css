@@ -1172,6 +1172,10 @@ body.offline .map-section {
   }
 
   .poi-modal .poi-popup p {
+    font-size: 0.85rem;
+  }
+
+  .poi-modal .poi-popup p.poi-distance-line {
     font-size: 3rem;
     line-height: 1.3;
   }

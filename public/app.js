@@ -16,6 +16,7 @@ let currentData = null;
 let currentTraceName = null;
 let selectedPoiTypes = [];
 let userLocationMarker = null;
+let geolocWatchInterval = null;
 let showKmMarkers = false;
 let isOffline = !navigator.onLine;
 let allPoiMarkers = [];
@@ -782,6 +783,8 @@ async function showMap(data) {
     }).addTo(map);
   }
 
+  startBackgroundGeoloc();
+
   // Clear existing layers
   if (trackLayer) map.removeLayer(trackLayer);
   Object.values(poiLayers).forEach(layer => {
@@ -1067,7 +1070,22 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Geolocation button — one-shot position
+function updateUserLocationMarker(latitude, longitude) {
+  if (userLocationMarker) {
+    userLocationMarker.setLatLng([latitude, longitude]);
+  } else {
+    userLocationMarker = L.circleMarker([latitude, longitude], {
+      radius: 10,
+      fillColor: '#667eea',
+      color: '#fff',
+      weight: 3,
+      opacity: 1,
+      fillOpacity: 0.8
+    }).addTo(map);
+  }
+}
+
+// Geolocation button — one-shot position, recenters the map
 geolocBtn.addEventListener('click', () => {
   if (!navigator.geolocation) {
     alert('Géolocalisation non supportée');
@@ -1080,20 +1098,7 @@ geolocBtn.addEventListener('click', () => {
     (position) => {
       geolocBtn.classList.remove('loading');
       const { latitude, longitude } = position.coords;
-
-      if (userLocationMarker) {
-        userLocationMarker.setLatLng([latitude, longitude]);
-      } else {
-        userLocationMarker = L.circleMarker([latitude, longitude], {
-          radius: 10,
-          fillColor: '#667eea',
-          color: '#fff',
-          weight: 3,
-          opacity: 1,
-          fillOpacity: 0.8
-        }).addTo(map);
-      }
-
+      updateUserLocationMarker(latitude, longitude);
       map.setView([latitude, longitude], 15);
     },
     () => {
@@ -1103,6 +1108,31 @@ geolocBtn.addEventListener('click', () => {
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 });
+
+// Background geolocation — keeps the user marker updated every 5s without
+// recentering the map (that stays a manual action via the geoloc button).
+function startBackgroundGeoloc() {
+  if (!navigator.geolocation || !isMobileViewport()) return;
+  if (geolocWatchInterval) clearInterval(geolocWatchInterval);
+
+  const updatePosition = () => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => updateUserLocationMarker(position.coords.latitude, position.coords.longitude),
+      () => {}, // fail silently in the background
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 4000 }
+    );
+  };
+
+  updatePosition();
+  geolocWatchInterval = setInterval(updatePosition, 5000);
+}
+
+function stopBackgroundGeoloc() {
+  if (geolocWatchInterval) {
+    clearInterval(geolocWatchInterval);
+    geolocWatchInterval = null;
+  }
+}
 
 // Back button
 // Select all / deselect all POI types
@@ -1131,6 +1161,7 @@ backBtn.addEventListener('click', () => {
   document.getElementById('poi-supermarket').checked = false;
 
   // Remove user location marker
+  stopBackgroundGeoloc();
   if (userLocationMarker) {
     map.removeLayer(userLocationMarker);
     userLocationMarker = null;

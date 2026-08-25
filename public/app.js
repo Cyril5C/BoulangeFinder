@@ -1040,6 +1040,52 @@ document.getElementById('poi-modal').addEventListener('click', (e) => {
   if (e.target === document.getElementById('poi-modal')) closePoiModal();
 });
 
+// Swipe down to close the POI modal (mobile only). Only starts tracking
+// once the scrollable body is at the top, so it doesn't fight normal scroll.
+(function setupPoiModalSwipe() {
+  const content = document.getElementById('poi-modal-content');
+  const body = document.getElementById('poi-modal-body');
+  const CLOSE_THRESHOLD = 100;
+
+  let startY = 0;
+  let deltaY = 0;
+  let dragging = false;
+
+  content.addEventListener('touchstart', (e) => {
+    if (!isMobileViewport() || body.scrollTop > 0) return;
+    startY = e.touches[0].clientY;
+    deltaY = 0;
+    dragging = true;
+    content.style.transition = 'none';
+  }, { passive: true });
+
+  content.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    deltaY = e.touches[0].clientY - startY;
+    if (deltaY > 0) {
+      e.preventDefault();
+      content.style.transform = `translateY(${deltaY}px)`;
+    }
+  }, { passive: false });
+
+  content.addEventListener('touchend', () => {
+    if (!dragging) return;
+    dragging = false;
+    content.style.transition = 'transform 0.2s ease';
+
+    if (deltaY > CLOSE_THRESHOLD) {
+      content.style.transform = 'translateY(100%)';
+      setTimeout(() => {
+        closePoiModal();
+        content.style.transition = '';
+        content.style.transform = '';
+      }, 200);
+    } else {
+      content.style.transform = '';
+    }
+  });
+})();
+
 // Comment modal
 document.getElementById('cancel-comment').addEventListener('click', () => {
   document.getElementById('comment-modal').classList.add('hidden');

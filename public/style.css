@@ -963,6 +963,41 @@ body.offline .map-section {
   text-decoration: underline;
 }
 
+/* POI detail modal (mobile full-screen POI info) */
+.poi-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-width: 420px;
+  max-height: 80vh;
+  padding: 0;
+}
+
+.poi-modal-close {
+  align-self: flex-end;
+  flex-shrink: 0;
+  margin: 10px 10px 0 0;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.poi-modal-close:active {
+  background: #e5e7eb;
+}
+
+#poi-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 20px 20px;
+}
+
 /* Distance markers */
 .distance-marker {
   background: transparent;
@@ -1103,6 +1138,72 @@ body.offline .map-section {
   .modal-content {
     max-width: 100%;
     margin: 0 4px;
+  }
+
+  /* POI detail modal — full screen on mobile */
+  .poi-modal {
+    padding: 0;
+  }
+
+  .poi-modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .poi-modal-close {
+    width: 48px;
+    height: 48px;
+    margin: calc(env(safe-area-inset-top, 0px) + 12px) 12px 0 0;
+    font-size: 1.4rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  #poi-modal-body {
+    padding: 4px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  }
+
+  .poi-modal .poi-popup h4 {
+    font-size: 1.35rem;
+    margin-top: 4px;
+  }
+
+  .poi-modal .poi-popup p {
+    font-size: 1rem;
+  }
+
+  .poi-modal .poi-type {
+    font-size: 0.85rem;
+    padding: 4px 12px;
+  }
+
+  .poi-modal .fav-btn,
+  .poi-modal .comment-btn,
+  .poi-modal .delete-custom-poi {
+    padding: 15px;
+    font-size: 1.05rem;
+    margin-top: 12px;
+  }
+
+  /* Big, easy-to-tap "Voir sur Google Maps" button */
+  .poi-modal .nav-link-gmaps {
+    display: block;
+    text-align: center;
+    margin-top: 20px;
+    padding: 18px;
+    border: none;
+    border-radius: 12px;
+    background: #4285f4;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .poi-modal .nav-link-gmaps:active {
+    background: #3367d6;
   }
 
   /* Prevent iOS Safari zoom on input focus (font-size must be >= 16px) */

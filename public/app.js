@@ -72,6 +72,7 @@ async function toggleFavorite(poiId) {
     const isFav = favoritePois.has(id);
     marker.setIcon(isFav ? createFavoriteIcon(poi.type) : (icons[poi.type] || icons.custom));
     marker.setPopupContent(createPopupContent(poi));
+    refreshPoiModalIfOpen(id);
   }
 
   if (showOnlyFavorites) applyFavoritesFilter();
@@ -126,6 +127,7 @@ async function saveComment(poiId, text) {
 
   const entry = markerByPoiId.get(id);
   if (entry) entry.marker.setPopupContent(createPopupContent(entry.poi));
+  refreshPoiModalIfOpen(id);
 }
 
 // ── Custom POIs ─────────────────────────────────────────────────────────────
@@ -865,6 +867,12 @@ function placePoiMarker(poi) {
   const marker = L.marker([poi.lat, poi.lon], { icon });
   marker.bindPopup(createPopupContent(poi));
   marker.poiData = poi;
+  marker.on('click', () => {
+    if (isMobileViewport()) {
+      marker.closePopup();
+      openPoiModal(poi);
+    }
+  });
 
   allPoiMarkers.push({ marker, poi, type: poi.type });
   markerByPoiId.set(String(poi.id), { marker, poi, type: poi.type });
@@ -892,12 +900,12 @@ function createPopupContent(poi) {
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
     <h4>${escapeHtml(poi.name)}</h4>
-    <p>↔ ${poi.distance}m de la trace`;
+    <p>↔ ${poi.distance}m de la trace</p>`;
 
   if (distDone !== null) {
-    html += ` · 🚴 ${distDone} km parcourus · ${distRemaining} km restants`;
+    html += `<p><strong>🏁 ${distRemaining} km restants</strong></p>`;
+    html += `<p>🚴 ${distDone} km parcourus</p>`;
   }
-  html += `</p>`;
 
   if (poi.tags?.opening_hours) {
     const hours = formatOpeningHours(poi.tags.opening_hours);
@@ -919,22 +927,20 @@ function createPopupContent(poi) {
     html += `<p>🌐 <a href="${escapeHtml(website)}" target="_blank" rel="noopener">Site web</a></p>`;
   }
 
+  if (poi.notes) {
+    html += `<p>📝 ${escapeHtml(poi.notes)}</p>`;
+  }
+
+  const comment = poi.type !== 'borne' ? poiComments.get(String(poi.id)) : null;
+  if (comment) {
+    html += `<p class="poi-comment">💬 ${escapeHtml(comment)}</p>`;
+  }
+
   if (poi.type !== 'borne') {
     const isFav = favoritePois.has(String(poi.id));
     html += `<button class="fav-btn ${isFav ? 'active' : ''}" data-poi-id="${escapeHtml(String(poi.id))}">
       ${isFav ? '⭐ Dans les favoris' : '☆ Ajouter aux favoris'}
     </button>`;
-  }
-
-  if (poi.notes) {
-    html += `<p>📝 ${escapeHtml(poi.notes)}</p>`;
-  }
-
-  if (poi.type !== 'borne') {
-    const comment = poiComments.get(String(poi.id));
-    if (comment) {
-      html += `<p class="poi-comment">💬 ${escapeHtml(comment)}</p>`;
-    }
     html += `<button class="comment-btn" data-poi-id="${escapeHtml(String(poi.id))}">
       ${comment ? '✏️ Modifier le commentaire' : '💬 Ajouter un commentaire'}
     </button>`;
@@ -953,12 +959,13 @@ function createPopupContent(poi) {
 }
 
 // Event delegation for popup buttons (fav + delete + comment)
-document.getElementById('map').addEventListener('click', (e) => {
+// Attached to document so it also catches clicks inside the mobile POI modal (a sibling of #map).
+document.addEventListener('click', (e) => {
   const favBtn = e.target.closest('.fav-btn');
   if (favBtn) { toggleFavorite(favBtn.dataset.poiId); return; }
 
   const delBtn = e.target.closest('.delete-custom-poi');
-  if (delBtn) { deleteCustomPoi(delBtn.dataset.poiId); return; }
+  if (delBtn) { deleteCustomPoi(delBtn.dataset.poiId); closePoiModal(); return; }
 
   const commentBtn = e.target.closest('.comment-btn');
   if (commentBtn) {
@@ -968,6 +975,37 @@ document.getElementById('map').addEventListener('click', (e) => {
     setTimeout(() => document.getElementById('comment-text').focus(), 50);
     return;
   }
+});
+
+// ── Mobile POI detail modal ──────────────────────────────────────────────────
+// On mobile the Leaflet popup is too small/cramped, so POI details open in a
+// full-screen modal instead (desktop keeps the anchored Leaflet popup).
+let currentModalPoi = null;
+
+function isMobileViewport() {
+  return window.matchMedia('(max-width: 640px)').matches;
+}
+
+function openPoiModal(poi) {
+  currentModalPoi = poi;
+  document.getElementById('poi-modal-body').innerHTML = createPopupContent(poi);
+  document.getElementById('poi-modal').classList.remove('hidden');
+}
+
+function closePoiModal() {
+  document.getElementById('poi-modal').classList.add('hidden');
+  currentModalPoi = null;
+}
+
+function refreshPoiModalIfOpen(poiId) {
+  if (currentModalPoi && String(currentModalPoi.id) === String(poiId)) {
+    document.getElementById('poi-modal-body').innerHTML = createPopupContent(currentModalPoi);
+  }
+}
+
+document.getElementById('poi-modal-close').addEventListener('click', closePoiModal);
+document.getElementById('poi-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('poi-modal')) closePoiModal();
 });
 
 // Comment modal

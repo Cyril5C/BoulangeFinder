@@ -1031,6 +1031,20 @@ body.offline .map-section {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+/* Direction arrows — subtle, non-interactive, opt-in via the km markers toggle */
+.track-arrow {
+  background: transparent;
+}
+
+.track-arrow-inner {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 8px solid rgba(26, 58, 107, 0.65);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
 

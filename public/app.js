@@ -1,6 +1,7 @@
 // Global state
 let map = null;
 let trackLayer = null;
+let arrowLayer = null;
 let poiLayers = {
   bakery: null,
   cafe: null,
@@ -787,6 +788,7 @@ async function showMap(data) {
 
   // Clear existing layers
   if (trackLayer) map.removeLayer(trackLayer);
+  if (arrowLayer) map.removeLayer(arrowLayer);
   Object.values(poiLayers).forEach(layer => {
     if (layer) map.removeLayer(layer);
   });
@@ -798,6 +800,11 @@ async function showMap(data) {
     weight: 4,
     opacity: 0.9
   }).addTo(map);
+
+  // Direction arrows — same opt-in toggle as km markers (📏) to avoid
+  // cluttering the map by default.
+  arrowLayer = buildTrackArrowLayer(data.track);
+  if (showKmMarkers) arrowLayer.addTo(map);
 
   // Create POI layers
   ['bakery','cafe','water','toilets','hotel','camping','restaurant','supermarket','borne','ravito','custom'].forEach(t => {
@@ -1364,6 +1371,12 @@ addPoiBtn.addEventListener('click', () => {
 document.getElementById('km-markers-btn').addEventListener('click', () => {
   showKmMarkers = !showKmMarkers;
   document.getElementById('km-markers-btn').classList.toggle('active', showKmMarkers);
+
+  if (arrowLayer) {
+    if (showKmMarkers) arrowLayer.addTo(map);
+    else map.removeLayer(arrowLayer);
+  }
+
   const borneLayer = poiLayers.borne;
   if (!borneLayer) return;
   if (showKmMarkers) borneLayer.addTo(map);
@@ -1542,6 +1555,50 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 
 function toRad(deg) {
   return deg * Math.PI / 180;
+}
+
+function getBearing(lat1, lon1, lat2, lon2) {
+  const dLon = toRad(lon2 - lon1);
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const y = Math.sin(dLon) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+// Direction arrows along the track, spaced every 5km and offset by 2.5km so
+// they never land exactly on the 10km bornes. Opt-in via showKmMarkers (📏)
+// instead of always-on — the earlier always-visible version caused clutter.
+function buildTrackArrowLayer(track) {
+  const layer = L.layerGroup();
+  const intervalKm = 5;
+  let cumDist = 0;
+  let nextArrowKm = intervalKm / 2;
+
+  for (let i = 1; i < track.length; i++) {
+    const segDist = haversineDistance(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon) / 1000;
+    if (segDist === 0) continue;
+    const prevCum = cumDist;
+    cumDist += segDist;
+
+    while (cumDist >= nextArrowKm) {
+      const ratio = (nextArrowKm - prevCum) / segDist;
+      const lat = track[i - 1].lat + ratio * (track[i].lat - track[i - 1].lat);
+      const lon = track[i - 1].lon + ratio * (track[i].lon - track[i - 1].lon);
+      const bearing = getBearing(track[i - 1].lat, track[i - 1].lon, track[i].lat, track[i].lon);
+
+      const icon = L.divIcon({
+        className: 'track-arrow',
+        html: `<div class="track-arrow-inner" style="transform:rotate(${bearing}deg)"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      L.marker([lat, lon], { icon, interactive: false }).addTo(layer);
+      nextArrowKm += intervalKm;
+    }
+  }
+
+  return layer;
 }
 
 function getTrackStats(track) {

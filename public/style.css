@@ -296,6 +296,11 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.cached-gpx-name:hover {
+  text-decoration: underline;
 }
 
 .cached-gpx-meta {
@@ -320,10 +325,6 @@ body {
 
 .cached-gpx-actions button:hover {
   background: #e0e0e0;
-}
-
-.cached-gpx-load:hover {
-  background: #d4edda !important;
 }
 
 .cached-gpx-delete:hover {

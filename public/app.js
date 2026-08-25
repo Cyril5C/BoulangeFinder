@@ -609,12 +609,11 @@ async function displayServerTracesList() {
           <span class="cached-gpx-meta">${trace.poiCount} POIs · ${getTimeAgo(trace.savedAt)}</span>
         </div>
         <div class="cached-gpx-actions">
-          <button class="cached-gpx-load" title="Charger">📂</button>
           <button class="cached-gpx-delete" title="Supprimer">🗑️</button>
         </div>
       `;
 
-      div.querySelector('.cached-gpx-load').addEventListener('click', async () => {
+      div.querySelector('.cached-gpx-name').addEventListener('click', async () => {
         try {
           const r = await fetch(`/api/traces/${trace.id}`, { credentials: 'same-origin' });
           if (!r.ok) { alert('Trace introuvable sur le serveur'); return; }

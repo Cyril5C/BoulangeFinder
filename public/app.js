@@ -900,11 +900,11 @@ function createPopupContent(poi) {
   let html = `<div class="poi-popup">
     <span class="poi-type ${poi.type}">${typeLabels[poi.type] || poi.type}</span>
     <h4>${escapeHtml(poi.name)}</h4>
-    <p>↔ ${poi.distance}m de la trace</p>`;
+    <p>↔ ${poi.distance}m</p>`;
 
   if (distDone !== null) {
-    html += `<p><strong>🏁 ${distRemaining} km restants</strong></p>`;
-    html += `<p>🚴 ${distDone} km parcourus</p>`;
+    html += `<p><strong>🏁 ${distRemaining}km</strong></p>`;
+    html += `<p>🚴 ${distDone}km</p>`;
   }
 
   if (poi.tags?.opening_hours) {
